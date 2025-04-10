@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ferremax</title>
+    <script src="https://www.paypal.com/sdk/js?client-id=AbT0QsbXWfHF-7mpDjW0eP_EGD_NfS7IEkoQjfWfBeTwXTSln1oG2PXAp7xEoHg7RO5q5XA2Z5ohPiv5&currency=USD&intent=capture&enable-funding=card" data-sdk-integration-source="integrationbuilder_sc"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" integrity="sha512-9usAa10IRO0HhonpyAIVpjrylPvoDwiPUiKdWk5t3PyolY1cOd4DSE0Ga+ri4AuTroPR5aQvXU9xC6qOPnzFeg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <style>
+        /* Estilos generales */
+        body {
+            font-family: 'Inter', sans-serif;
+            /* background-color: #f3f4f6; Quitamos el fondo gris sólido */
+            color: #1f2937;
+            line-height: 1.6;
+            position: relative; /* Necesario para el pseudo-elemento del fondo */
+            min-height: 100vh;
+        }
+
+        /* === ESTILO AÑADIDO: Fondo Difuminado === */
+        body::before {
+            content: "";
+            position: fixed; /* Fijo para que no se mueva con el scroll */
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            /* IMPORTANTE: Asegúrate que la ruta a tu imagen sea correcta */
+            background-image: url('images/fondo-principal.jpg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            /* Efecto difuminado y opacidad */
+            filter: blur(5px); /* Ajusta el valor de blur según tu gusto */
+            opacity: 0.6; /* Ajusta la opacidad (0 a 1) */
+            z-index: -1; /* Colocar detrás de todo el contenido */
+        }
+        /* Contenedor principal para asegurar que esté sobre el fondo */
+         body > .flex-grow {
+             position: relative;
+             z-index: 1;
+             background-color: rgba(243, 244, 246, 0.8); /* Fondo semi-transparente gris claro para legibilidad */
+             /* Ajusta la opacidad (el último valor, 0.8) si quieres más o menos transparencia */
+         }
+        /* === Fin Estilo Fondo === */
+
+        /* Estilos tarjetas producto */
+        .card-img-container{height:200px;display:flex;align-items:center;justify-content:center;background-color:#fff;overflow:hidden;padding:.5rem}
+        .card-img-top{max-height:100%;max-width:100%;object-fit:contain;display:block}
+        /* Estilos mensajes */
+        .message{padding:1rem;margin-bottom:1rem;border-radius:.375rem;font-weight:500;display:none;border:1px solid transparent}
+        .message-error{background-color:#fee2e2;color:#b91c1c;border-color:#fecaca}
+        .message-success{background-color:#dcfce7;color:#166534;border-color:#bbf7d0}
+        /* Estilos clickables */
+        .clickable-product,.buy-button-grid, .category-card{cursor:pointer}
+        /* Estilos detalle producto */
+        .product-detail-container{display:flex;flex-direction:column;align-items:center;gap:1.5rem;padding:1.5rem;background-color:#fff;border-radius:.5rem;box-shadow:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -2px rgba(0,0,0,.1);max-width:56rem;margin-left:auto;margin-right:auto}
+        @media (min-width:768px){.product-detail-container{flex-direction:row;align-items:flex-start;padding:2rem}}
+        .product-detail-image-container{width:100%;max-width:350px;flex-shrink:0;background-color:#fff;border-radius:.375rem;display:flex;align-items:center;justify-content:center;padding:1rem;border:1px solid #e5e7eb}
+        .product-detail-image{max-width:100%;max-height:400px;object-fit:contain}
+        .product-detail-info{flex-grow:1;width:100%}
+        #payment-button-container{margin-top:1.5rem;min-height:50px;position:relative}
+        #payment-processing-message{margin-top:1rem;font-style:italic;color:#4b5563;text-align:center}
+        h2, h3{color:#111827}
+
+        /* Estilos Banner Promocional */
+        .promo-banner{background:linear-gradient(to right,#1e3a8a,#3b82f6);color:#fff;padding:2rem 1rem;border-radius:.5rem;text-align:center;margin-bottom:2rem}
+        .promo-banner h3{font-size:1.5rem;font-weight:700;margin-bottom:.5rem;color:#fff}
+        .promo-banner p{margin-bottom:1rem;font-size:1rem}
+        .promo-banner .cta-button{background-color:#fff;color:#1e3a8a;padding:.6rem 1.5rem;border-radius:.375rem;font-weight:600;text-decoration:none;display:inline-block;transition:background-color .2s ease,color .2s ease;cursor:pointer}
+        .promo-banner .cta-button:hover{background-color:#f3f4f6}
+
+        /* Estilos Carrusel */
+        .carousel-container{max-width:800px;margin:2rem auto;position:relative;overflow:hidden;border-radius:.5rem;box-shadow:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -1px rgba(0,0,0,.06);background-color:#fff}
+        .carousel-slides{display:flex;transition:transform .5s ease-in-out;background-color:#f9fafb}
+        .carousel-slide{min-width:100%;box-sizing:border-box;text-align:center;padding:1rem;display:none;flex-direction:column;align-items:center;justify-content:center;height:300px}
+        .carousel-slide.active{display:flex}
+        .carousel-slide img{max-height:80%;max-width:90%;object-fit:contain;margin-bottom:.5rem}
+        .carousel-slide p{font-weight:500;color:#374151;font-size:.875rem;margin-top:auto}
+        .carousel-button{position:absolute;top:50%;transform:translateY(-50%);background-color:rgba(0,0,0,.4);color:#fff;border:none;padding:.5rem .8rem;cursor:pointer;border-radius:50%;z-index:10;font-size:1rem;width:40px;height:40px;display:flex;align-items:center;justify-content:center;transition:background-color .2s ease}
+        .carousel-button:hover{background-color:rgba(0,0,0,.7)}
+        .carousel-button.prev{left:10px}
+        .carousel-button.next{right:10px}
+
+        /* Estilos Sección Categorías */
+        #categories-section {margin-top: 3rem; margin-bottom: 3rem;}
+        .category-grid {display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;}
+        @media (min-width: 640px) {.category-grid {grid-template-columns: repeat(3, 1fr);}}
+        @media (min-width: 1024px) {.category-grid {grid-template-columns: repeat(6, 1fr);}}
+        .category-card {background-color: white; border-radius: 0.5rem; padding: 1.5rem 1rem; text-align: center; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06); transition: transform 0.2s ease, box-shadow 0.2s ease;}
+        .category-card:hover {transform: translateY(-4px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);}
+        .category-card i {font-size: 2rem; color: #3b82f6; margin-bottom: 0.75rem; display: block;}
+        .category-card span {font-weight: 600; color: #1f2937; font-size: 0.875rem;}
+
+        /* Estilos para la sección de Políticas */
+        #policies-section .policy-item {
+            background-color: white;
+            padding: 1.5rem;
+            border-radius: 0.5rem; /* rounded-lg */
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06); /* shadow-md */
+            margin-bottom: 1.5rem; /* Espacio entre políticas */
+        }
+         #policies-section .policy-item h3 {
+             margin-bottom: 0.75rem; /* Espacio bajo el título de la política */
+             font-size: 1.25rem; /* text-xl */
+             font-weight: 600; /* semibold */
+         }
+         #policies-section .policy-item p {
+             color: #374151; /* gray-700 */
+             line-height: 1.7; /* Mayor interlineado para legibilidad */
+         }
+
+    </style>
+</head>
+
+<body class="flex flex-col min-h-screen">
+
+    <div class="flex-grow">
+
+        <section id="login-section" class="container mx-auto mt-10 p-6 max-w-md bg-white rounded-lg shadow-md" style="display: none;">
+             <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Ferremax - Iniciar Sesión</h2>
+             <div id="login-message" class="message"></div>
+             <form id="loginForm">
+                 <div class="mb-4"><label for="login-email" class="block text-gray-700 text-sm font-bold mb-2">Correo Electrónico</label><input type="email" id="login-email" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="tu@email.com" required></div>
+                 <div class="mb-6"><label for="login-password" class="block text-gray-700 text-sm font-bold mb-2">Contraseña</label><input type="password" id="login-password" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="******************" required></div>
+                 <div class="flex items-center justify-between mb-4"><button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full">Iniciar Sesión</button></div>
+                 <p class="text-center text-gray-600 text-sm">¿No tienes cuenta? <a href="#" id="show-register" class="font-bold text-blue-600 hover:text-blue-800">Regístrate aquí</a></p>
+             </form>
+        </section>
+
+        <section id="register-section" class="container mx-auto mt-10 p-6 max-w-md bg-white rounded-lg shadow-md" style="display: none;">
+             <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Ferremax - Registrarse</h2>
+             <div id="register-message" class="message"></div>
+             <form id="registerForm">
+                 <div class="mb-4"><label for="register-username" class="block text-gray-700 text-sm font-bold mb-2">Nombre de Usuario</label><input type="text" id="register-username" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Tu Nombre de Usuario" required></div>
+                 <div class="mb-4"><label for="register-email" class="block text-gray-700 text-sm font-bold mb-2">Correo Electrónico</label><input type="email" id="register-email" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="tu@email.com" required></div>
+                 <div class="mb-6"><label for="register-password" class="block text-gray-700 text-sm font-bold mb-2">Contraseña</label><input type="password" id="register-password" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 mb-3 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Mínimo 6 caracteres" required minlength="6"></div>
+                 <div class="flex items-center justify-between mb-4"><button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline w-full">Registrarse</button></div>
+                 <p class="text-center text-gray-600 text-sm">¿Ya tienes cuenta? <a href="#" id="show-login" class="font-bold text-blue-600 hover:text-blue-800">Inicia sesión aquí</a></p>
+             </form>
+        </section>
+
+        <section id="main-content" style="display: none;">
+            <header class="bg-gray-800 text-white shadow-lg sticky top-0 z-50">
+                 <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                     <div class="flex items-center justify-between h-16">
+                         <h1 class="text-2xl sm:text-3xl font-bold">Ferremax</h1>
+                         <nav class="hidden sm:flex sm:items-center sm:space-x-4">
+                             <a href="#" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-700" data-section="home">Inicio</a>
+                             <a href="#" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-700" data-section="products">Productos</a>
+                             <a href="#" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-700" data-section="contact">Contacto</a>
+                             <a href="#" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-700" data-section="policies">Políticas</a>
+                             <button id="logoutButton" class="bg-red-600 hover:bg-red-700 text-white font-bold py-1 px-3 rounded text-sm">Cerrar Sesión</button>
+                         </nav>
+                         <div class="sm:hidden">
+                             <button id="mobile-menu-button" type="button" class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white" aria-controls="mobile-menu" aria-expanded="false">
+                                 <span class="sr-only">Abrir menú principal</span>
+                                 <svg class="block h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" /></svg>
+                                 <svg class="hidden h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                             </button>
+                         </div>
+                     </div>
+                 </div>
+                 <div class="sm:hidden hidden" id="mobile-menu">
+                     <div class="px-2 pt-2 pb-3 space-y-1">
+                         <a href="#" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700" data-section="home">Inicio</a>
+                         <a href="#" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700" data-section="products">Productos</a>
+                         <a href="#" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700" data-section="contact">Contacto</a>
+                         <a href="#" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700" data-section="policies">Políticas</a>
+                         <button id="logoutButtonMobile" class="w-full text-left block px-3 py-2 rounded-md text-base font-medium bg-red-600 hover:bg-red-700 text-white">Cerrar Sesión</button>
+                     </div>
+                 </div>
+            </header>
+
+            <main class="container mx-auto mt-6 mb-8 p-4 sm:p-6" id="page-content">
+
+                <div id="home-section">
+                    <h2 class="text-3xl font-semibold text-gray-800 mb-6 text-center">Bienvenido a Ferremax</h2>
+                    <div class="promo-banner">
+                        <h3>¡Ofertas Imperdibles de Temporada!</h3>
+                        <p>Encuentra descuentos especiales en herramientas seleccionadas. ¡No te lo pierdas!</p>
+                        <button class="cta-button" data-section="products">Ver Ofertas Ahora</button>
+                    </div>
+                    <p class="text-gray-600 mb-8 text-center max-w-3xl mx-auto">
+                        Desde 1999, Ferremax ha sido un pilar en la industria de la construcción. Fundada por la familia Rodríguez, nuestra empresa ha crecido de una pequeña tienda local a un referente en calidad y servicio en la región. Nuestro compromiso es ofrecer productos de alta calidad y un servicio excepcional.
+                    </p>
+                     <div class="carousel-container">
+                         <div class="carousel-slides"></div>
+                         <button class="carousel-button prev"><i class="fas fa-chevron-left"></i></button>
+                         <button class="carousel-button next"><i class="fas fa-chevron-right"></i></button>
+                     </div>
+                     <section id="categories-section">
+                         <h3 class="text-2xl font-semibold text-gray-800 mt-10 mb-6 text-center">Explora por Categoría</h3>
+                         <div id="category-grid-container" class="category-grid"></div>
+                     </section>
+                     <h3 class="text-2xl font-semibold text-gray-800 mt-10 mb-6 text-center">Nuestros Productos Más Vendidos</h3>
+                    <div id="featured-products-container" class="grid grid-cols-1 md:grid-cols-3 gap-6"></div>
+                </div>
+
+                <div id="products-section" style="display: none;">
+                    <h2 class="text-3xl font-semibold text-gray-800 mb-6 text-center">Nuestros Productos</h2>
+                     <div id="products-display-area" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"></div>
+                </div>
+
+                <div id="contact-section" style="display: none;">
+                    <h2 class="text-3xl font-semibold text-gray-800 mb-6 text-center">Contáctanos</h2>
+                     <form id="contactForm" class="max-w-lg mx-auto bg-white p-8 rounded-lg shadow-md">
+                         <div id="contact-message-response" class="message mb-4"></div>
+                         <div class="mb-4"><label for="contact-name" class="block text-gray-700 text-sm font-bold mb-2">Nombre</label><input type="text" id="contact-name" name="name" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" required></div>
+                         <div class="mb-4"><label for="contact-email" class="block text-gray-700 text-sm font-bold mb-2">Correo Electrónico</label><input type="email" id="contact-email" name="email" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" required></div>
+                         <div class="mb-4"><label for="contact-subject" class="block text-gray-700 text-sm font-bold mb-2">Asunto</label><input type="text" id="contact-subject" name="subject" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" required></div>
+                         <div class="mb-6"><label for="contact-message" class="block text-gray-700 text-sm font-bold mb-2">Mensaje</label><textarea id="contact-message" name="message" rows="4" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500" required></textarea></div>
+                         <button type="submit" id="contactSubmitButton" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline transition duration-300">Enviar Mensaje</button>
+                     </form>
+                </div>
+
+                <div id="policies-section" style="display: none;">
+                    <h2 class="text-3xl font-semibold text-gray-800 mb-6 text-center">Políticas de la Empresa</h2>
+                    <div class="space-y-6">
+                        <div class="policy-item">
+                            <h3>Política de Privacidad</h3>
+                            <p>En Ferretería Ferremax, nos tomamos muy en serio la privacidad de nuestros clientes. Toda la información personal que recopilamos es utilizada exclusivamente para brindarte el mejor servicio posible y no será compartida con terceros sin tu consentimiento. Nos comprometemos a proteger tus datos personales y a cumplir con las leyes de protección de datos vigentes.</p>
+                        </div>
+                        <div class="policy-item">
+                            <h3>Política de Devoluciones</h3>
+                            <p>Ofrecemos un período de 30 días para devoluciones en productos defectuosos o no satisfactorios. Para iniciar una devolución, contáctanos a través de nuestro formulario de contacto y te proporcionaremos las instrucciones necesarias. Los productos deben estar en su estado original y con el embalaje completo para ser aceptados.</p>
+                        </div>
+                        <div class="policy-item">
+                            <h3>Política de Envío</h3>
+                            <p>Realizamos envíos a nivel nacional con costos adicionales según la ubicación. Los tiempos de entrega varían entre 3 y 7 días hábiles, dependiendo del destino. Los costos de envío serán calculados al momento de la compra y se añadirán al total del pedido. Si hay algún retraso en el envío, te informaremos lo antes posible.</p>
+                        </div>
+                        <div class="policy-item">
+                            <h3>Política de Seguridad</h3>
+                            <p>Utilizamos tecnología de encriptación avanzada para proteger tus datos personales y de pago durante las transacciones. Implementamos medidas de seguridad para evitar accesos no autorizados y garantizar la integridad de tu información. Si tienes alguna duda sobre nuestras medidas de seguridad, no dudes en contactarnos.</p>
+                        </div>
+                        <div class="policy-item">
+                            <h3>Política de Atención al Cliente</h3>
+                            <p>Nos comprometemos a ofrecer un excelente servicio al cliente. Si tienes preguntas o inquietudes, nuestro equipo de atención al cliente está disponible para asistirte. Puedes contactarnos a través del formulario de contacto en nuestra página o por correo electrónico. Responderemos a tus consultas en un plazo de 24 horas hábiles.</p>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </section>
+
+    </div> <footer class="bg-gray-700 text-white text-center py-4 mt-auto">
+         <div class="container mx-auto px-4">
+             <p>&copy; <span id="current-year"></span> Ferremax - Todos los derechos reservados</p>
+         </div>
+    </footer>
+
+    <script>
+        // --- CONSTANTES Y ELEMENTOS DEL DOM ---
+        const loginSection=document.getElementById("login-section"),registerSection=document.getElementById("register-section"),mainContent=document.getElementById("main-content"),pageContent=document.getElementById("page-content"),featuredProductsContainer=document.getElementById("featured-products-container"),productsDisplayArea=document.getElementById("products-display-area"),contactForm=document.getElementById("contactForm"),contactMessageResponseDiv=document.getElementById("contact-message-response"),contactSubmitButton=document.getElementById("contactSubmitButton"),loginForm=document.getElementById("loginForm"),registerForm=document.getElementById("registerForm"),logoutButton=document.getElementById("logoutButton"),logoutButtonMobile=document.getElementById("logoutButtonMobile"),showRegisterLink=document.getElementById("show-register"),showLoginLink=document.getElementById("show-login"),navLinks=document.querySelectorAll("header nav a[data-section], header nav button[data-section]"),mobileMenuButton=document.getElementById("mobile-menu-button"),mobileMenu=document.getElementById("mobile-menu"),loginMessageDiv=document.getElementById("login-message"),registerMessageDiv=document.getElementById("register-message"),API_URL="http://localhost:4000";
+        const categoryGridContainer = document.getElementById('category-grid-container');
+
+        // --- DATOS DE PRODUCTOS ---
+        const productsData=[{id:1,name:"Taladro Inalámbrico",imageSrc:"images/taladro-inalambrico.jpg",price:150,description:"Potente taladro inalámbrico...",featured:!0},{id:2,name:"Rotomartillo",imageSrc:"images/taladro-rotomartillo.jpg",price:75.5,description:"Rotomartillo robusto...",featured:!0},{id:3,name:"Martillo",imageSrc:"images/martillo-set-herramientas.jpg",price:30,description:"Martillo de uña clásico...",featured:!0},{id:4,name:"Carretilla Multiusos",imageSrc:"images/carretilla-de-mano-multiusos.jpg",price:120,description:"Carretilla resistente..."},{id:5,name:"Guantes de Cuero",imageSrc:"images/guande-de-cuero.jpg",price:25,description:"Guantes de trabajo..."},{id:6,name:"Juego de Brocas",imageSrc:"images/juego-de-brocas.jpg",price:45,description:"Completo juego de brocas..."},{id:7,name:"Kit de Herramientas",imageSrc:"images/kits-de-herramientas.jpg",price:199.99,description:"Kit esencial..."},{id:8,name:"Nivel Láser",imageSrc:"images/nivel-laser.jpg",price:85,description:"Nivel láser autonivelante..."},{id:9,name:"Protector Auditivo",imageSrc:"images/protector-auditivo.jpg",price:18.5,description:"Protectores auditivos..."}];
+
+        // --- DATOS DE CATEGORÍAS ---
+        const categoriesData = [ { name: "Eléctricas", icon: "fa-solid fa-plug-circle-bolt", id: "electricas" }, { name: "Manuales", icon: "fa-solid fa-wrench", id: "manuales" }, { name: "Seguridad", icon: "fa-solid fa-hard-hat", id: "seguridad" }, { name: "Medición", icon: "fa-solid fa-ruler-combined", id: "medicion" }, { name: "Tornillería", icon: "fa-solid fa-screwdriver-wrench", id: "tornilleria" }, { name: "Jardinería", icon: "fa-solid fa-leaf", id: "jardineria" } ];
+
+        // --- LÓGICA DEL CARRUSEL ---
+        const carouselSlidesContainer = document.querySelector('.carousel-slides');
+        const carouselPrevButton = document.querySelector('.carousel-button.prev');
+        const carouselNextButton = document.querySelector('.carousel-button.next');
+        let currentSlideIndex = 0; let slideInterval; const SLIDE_INTERVAL_TIME = 4000; let slides = [];
+        function createCarouselSlides() { if (!carouselSlidesContainer || carouselSlidesContainer.children.length > 0) return; slides = []; const productsForCarousel = productsData.slice(0, 6); if (productsForCarousel.length === 0) return; productsForCarousel.forEach((product, index) => { const slide = document.createElement('div'); slide.className = 'carousel-slide'; slide.setAttribute('data-index', index); slide.innerHTML = `<img src="${product.imageSrc}" alt="${product.name}" onerror="this.onerror=null;this.src='https://placehold.co/400x200/cccccc/666666?text=Producto';"><p>${product.name}</p>`; if (index === 0) slide.classList.add('active'); carouselSlidesContainer.appendChild(slide); slides.push(slide); }); if (slides.length > 1) startSlideInterval(); else { if(carouselPrevButton) carouselPrevButton.style.display = 'none'; if(carouselNextButton) carouselNextButton.style.display = 'none'; } }
+        function showSlide(index) { if (!carouselSlidesContainer || slides.length === 0) return; if (index >= slides.length) currentSlideIndex = 0; else if (index < 0) currentSlideIndex = slides.length - 1; else currentSlideIndex = index; slides.forEach((slide, i) => { if (i === currentSlideIndex) slide.classList.add('active'); else slide.classList.remove('active'); }); }
+        function nextSlide() { showSlide(currentSlideIndex + 1); } function prevSlide() { showSlide(currentSlideIndex - 1); } function startSlideInterval() { stopSlideInterval(); if (slides.length > 1) slideInterval = setInterval(nextSlide, SLIDE_INTERVAL_TIME); } function stopSlideInterval() { clearInterval(slideInterval); }
+        if (carouselPrevButton && carouselNextButton) { carouselPrevButton.addEventListener('click', () => { prevSlide(); stopSlideInterval(); }); carouselNextButton.addEventListener('click', () => { nextSlide(); stopSlideInterval(); }); const carouselContainer = document.querySelector('.carousel-container'); if (carouselContainer) { carouselContainer.addEventListener('mouseenter', stopSlideInterval); carouselContainer.addEventListener('mouseleave', startSlideInterval); } }
+
+        // --- LÓGICA PARA RENDERIZAR CATEGORÍAS ---
+        function renderCategories() { if (!categoryGridContainer) return; categoryGridContainer.innerHTML = ''; categoriesData.forEach(category => { const card = document.createElement('div'); card.className = 'category-card'; card.setAttribute('data-category-id', category.id); card.innerHTML = `<i class="${category.icon}"></i><span>${category.name}</span>`; categoryGridContainer.appendChild(card); }); categoryGridContainer.removeEventListener('click', handleCategoryClick); categoryGridContainer.addEventListener('click', handleCategoryClick); }
+        function handleCategoryClick(event) { const categoryCard = event.target.closest('.category-card'); if (categoryCard) { const categoryId = categoryCard.getAttribute('data-category-id'); console.log("Categoría clickeada:", categoryId); showPageSection('products'); } }
+
+        // --- FUNCIONES DE RENDERIZADO DE PRODUCTOS ---
+        function renderProductCard(t,e=!1){const n=document.createElement("div");return n.className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col clickable-product transition transform hover:scale-105 duration-300",n.setAttribute("data-product-id",t.id),n.innerHTML=`\n                <div class="card-img-container">\n                    <img src="${t.imageSrc}" class="card-img-top" alt="${t.name}"\n                         onerror="this.onerror=null;this.src='https://placehold.co/300x200/cccccc/666666?text=Imagen+no+disponible';">\n                </div>\n                <div class="p-4 flex flex-col flex-grow">\n                    <h5 class="text-lg font-semibold text-gray-800 truncate mb-1">${t.name}</h5>\n                    ${e?"":`<p class="text-gray-600 text-sm mb-2 mt-1 flex-grow min-h-[40px]">${t.description}</p>`}\n                    <p class="text-xl font-bold text-green-600 mt-2 mb-3">$${t.price.toFixed(2)}</p>\n                    <button class="buy-button-grid mt-auto w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-300" data-product-id-buy="${t.id}">\n                        Comprar Ahora\n                    </button>\n                </div>\n            `,n}
+        function renderProductGrid(t){t.innerHTML="",t.className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6",productsData.forEach(e=>{t.appendChild(renderProductCard(e,!1))}),t.removeEventListener("click",handleGridItemClick),t.addEventListener("click",handleGridItemClick)}
+        function renderFeaturedProducts(t){t.innerHTML="",t.className="grid grid-cols-1 md:grid-cols-3 gap-6",productsData.filter(t=>t.featured).forEach(e=>{t.appendChild(renderProductCard(e,!0))}),t.removeEventListener("click",handleGridItemClick),t.addEventListener("click",handleGridItemClick)}
+        function renderProductDetail(t,e){const n=productsData.find(t=>t.id===e);if(!n)return void(t.innerHTML='<p class="text-center text-red-600">Producto no encontrado.</p>');t.innerHTML="",t.className="";const o=document.createElement("div");o.className="product-detail-container max-w-4xl mx-auto",o.innerHTML=`\n                <div class="product-detail-image-container">\n                     <img src="${n.imageSrc}" class="product-detail-image" alt="${n.name}"\n                          onerror="this.onerror=null;this.src='https://placehold.co/600x400/cccccc/666666?text=Imagen+no+disponible';">\n                </div>\n                <div class="product-detail-info">\n                    <h3 class="text-2xl lg:text-3xl font-bold text-gray-800 mb-3">${n.name}</h3>\n                    <p class="text-gray-700 mb-4">${n.description}</p>\n                    <p class="text-3xl font-bold text-green-600 mb-6">$${n.price.toFixed(2)}</p>\n                    <div id="payment-button-container">\n                        <div id="paypal-button-container-${n.id}"></div>\n                        <p id="payment-processing-message" class="hidden text-center mt-2 text-blue-600">Procesando pago...</p>\n                        <div id="payment-result-message" class="message mt-4"></div>\n                    </div>\n                    <button id="back-to-products" class="mt-6 w-full sm:w-auto bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded transition duration-300">\n                        Volver a Productos\n                    </button>\n                </div>\n            `,t.appendChild(o),renderPayPalButtons(n);const d=o.querySelector("#back-to-products");d&&d.addEventListener("click",()=>{showPageSection("products")})}
+
+        // --- LÓGICA DE PAYPAL ---
+        function renderPayPalButtons(t){const e=`#paypal-button-container-${t.id}`,n=document.getElementById("payment-processing-message"),o=document.getElementById("payment-result-message"),d=document.querySelector(e);if(!d)return void console.error(`Contenedor PayPal no encontrado: ${e}`);d.innerHTML="",n&&n.classList.add("hidden"),o&&(o.style.display="none");try{if("undefined"==typeof paypal||"function"!=typeof paypal.Buttons)return console.error("SDK de PayPal no cargado."),void(d.innerHTML='<p class="text-red-600 text-center">Error al cargar botones de pago.</p>');paypal.Buttons({createOrder:async(e,d)=>{o&&(o.style.display="none"),n&&n.classList.add("hidden");try{const e=await fetch(`${API_URL}/api/orders`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({productId:t.id})}),d=await e.json();if(!e.ok||!d.id)throw new Error(d.message||"No se pudo crear la orden.");return d.id}catch(t){return console.error("Error creando orden:",t),showMessage(o,`Error al iniciar pago: ${t.message}`,!0),null}},onApprove:async(e,d)=>{n&&n.classList.remove("hidden"),o&&(o.style.display="none");try{const n=await fetch(`${API_URL}/api/orders/${e.orderID}/capture`,{method:"POST",headers:{"Content-Type":"application/json"}}),r=await n.json();const i=document.getElementById(`paypal-button-container-${t.id}`);if(processingMessage&&processingMessage.classList.add("hidden"),!n.ok||!r.success){if("INSTRUMENT_DECLINED"===r.paypal_error)showMessage(o,"Pago declinado. Intenta con otro método.",!0);else showMessage(o,`Error al completar pago: ${r.message||"Intenta de nuevo."}`,!0);throw new Error(r.message||"No se pudo capturar el pago.")}showMessage(o,`¡Pago completado! ID: ${r.capture?.id||"N/A"}`,!1),i&&(i.innerHTML='<p class="text-green-600 font-semibold text-center">¡Gracias por tu compra!</p>')}catch(t){processingMessage&&processingMessage.classList.add("hidden"),console.error("Error capturando pago:",t),o&&(!o.textContent||"none"===o.style.display)&&showMessage(o,`Error al procesar pago: ${t.message}`,!0)}},onError:t=>{console.error("Error PayPal SDK:",t),showMessage(o,"Error inesperado en el proceso de pago.",!0),n&&n.classList.add("hidden")},onCancel:t=>{console.log("Pago cancelado:",t.orderID),showMessage(o,"Proceso de pago cancelado.",!0),n&&n.classList.add("hidden")}}).render(e).catch(t=>{console.error("Error renderizando botones PayPal:",t),d.innerHTML='<p class="text-red-600 text-center">Error al mostrar opciones de pago.</p>'})}catch(t){console.error("Error inicializando PayPal Buttons:",t),d.innerHTML='<p class="text-red-600 text-center">Error al inicializar pago.</p>'}}
+
+        // --- FUNCIONES AUXILIARES Y MANEJADORES DE EVENTOS ---
+        function showMessage(t,e,n=!0){if(!t)return;t.textContent=e,t.className=`message ${n?"message-error":"message-success"}`,t.style.display="block";const o=document.getElementById("payment-result-message");t!==o&&setTimeout(()=>{if(t.style.display !== 'none') { t.style.display='none'}},5e3)}
+        function hideMessages(){document.querySelectorAll(".message").forEach(t=>t.style.display="none");const t=document.getElementById("payment-processing-message");t&&t.classList.add("hidden")}
+        function showPageSection(t,e=null){hideMessages();const n=pageContent.children;for(let t of n)t.id&&t.id.endsWith("-section")&&(t.style.display="none");const o=document.getElementById(`${t}-section`);if(o){if(o.style.display="block","home"===t){if(featuredProductsContainer&&0===featuredProductsContainer.children.length&&renderFeaturedProducts(featuredProductsContainer),carouselSlidesContainer){createCarouselSlides()} if(categoryGridContainer){renderCategories()}}else if("products"===t)if(e)renderProductDetail(productsDisplayArea,e);else renderProductGrid(productsDisplayArea)}else{console.warn(`Sección "${t}-section" no encontrada.`);const t=document.getElementById("home-section");t&&(t.style.display="block"),featuredProductsContainer&&0===featuredProductsContainer.children.length&&renderFeaturedProducts(featuredProductsContainer),carouselSlidesContainer&&createCarouselSlides(), categoryGridContainer&&renderCategories()}if(mobileMenu&&mobileMenuButton){mobileMenu.classList.add("hidden"),mobileMenuButton.setAttribute("aria-expanded","false");const t=mobileMenuButton.querySelector("svg.block"),e=mobileMenuButton.querySelector("svg.hidden");t&&t.classList.remove("hidden"),e&&e.classList.add("hidden")}window.scrollTo(0,0)}
+        function updateUI(t){t?(loginSection.style.display="none",registerSection.style.display="none",mainContent.style.display="block",showPageSection("home")):(loginSection.style.display="block",registerSection.style.display="none",mainContent.style.display="none",featuredProductsContainer&&(featuredProductsContainer.innerHTML=""),productsDisplayArea&&(productsDisplayArea.innerHTML=""),carouselSlidesContainer&&(carouselSlidesContainer.innerHTML=""), categoryGridContainer&&(categoryGridContainer.innerHTML=""))}
+
+        // --- MANEJADORES DE EVENTOS ---
+        function handleGridItemClick(t){const e=t.target.closest(".clickable-product"),n=t.target.closest(".buy-button-grid");let o=null;n?(o=parseInt(n.getAttribute("data-product-id-buy")),console.log("Botón Comprar clickeado, ID:",o)):e&&(o=parseInt(e.getAttribute("data-product-id")),console.log("Tarjeta clickeada, ID:",o)),o&&showPageSection("products",o)}
+        featuredProductsContainer&&featuredProductsContainer.addEventListener("click",handleGridItemClick),productsDisplayArea&&productsDisplayArea.addEventListener("click",handleGridItemClick),loginForm&&loginForm.addEventListener("submit",async t=>{t.preventDefault(),hideMessages();const e=document.getElementById("login-email").value,n=document.getElementById("login-password").value;try{const t=await fetch(`${API_URL}/login`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:e,password:n})}),o=await t.json();t.ok&&o.success?(localStorage.setItem("userLoggedIn","true"),localStorage.setItem("userEmail",e),updateUI(!0)):showMessage(loginMessageDiv,o.message||"Error en inicio de sesión.",!0)}catch(t){console.error("Error fetch /login:",t),showMessage(loginMessageDiv,"No se pudo conectar al servidor.",!0)}}),registerForm&&registerForm.addEventListener("submit",async t=>{t.preventDefault(),hideMessages();const e=document.getElementById("register-username").value,n=document.getElementById("register-email").value,o=document.getElementById("register-password").value;if(o.length<6)return void showMessage(registerMessageDiv,"Contraseña debe tener al menos 6 caracteres.",!0);try{const t=await fetch(`${API_URL}/register`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:e,email:n,password:o})}),d=await t.json();t.ok&&d.success?(showMessage(registerMessageDiv,"¡Registro exitoso! Inicia sesión.",!1),setTimeout(()=>{registerSection.style.display="none",loginSection.style.display="block",loginForm&&loginForm.reset(),registerForm&&registerForm.reset(),hideMessages()},2500)):showMessage(registerMessageDiv,d.message||"Error en registro.",!0)}catch(t){console.error("Error fetch /register:",t),showMessage(registerMessageDiv,"No se pudo conectar al servidor.",!0)}}),contactForm&&contactForm.addEventListener("submit",async t=>{t.preventDefault(),hideMessages(),contactSubmitButton.disabled=!0,contactSubmitButton.textContent="Enviando...";const e=new FormData(contactForm),n=Object.fromEntries(e.entries());if(!n.name||!n.email||!n.subject||!n.message)return showMessage(contactMessageResponseDiv,"Completa todos los campos.",!0),contactSubmitButton.disabled=!1,void(contactSubmitButton.textContent="Enviar Mensaje");try{const t=await fetch(`${API_URL}/api/contact`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(n)}),e=await t.json();t.ok&&e.success?(showMessage(contactMessageResponseDiv,"¡Mensaje recibido con éxito!",!1),contactForm.reset()):showMessage(contactMessageResponseDiv,e.message||"Error al enviar.",!0)}catch(t){console.error("Error enviando contacto:",t),showMessage(contactMessageResponseDiv,"Error de conexión al enviar.",!0)}finally{contactSubmitButton.disabled=!1,contactSubmitButton.textContent="Enviar Mensaje"}});
+        function handleLogout(){localStorage.removeItem("userLoggedIn"),localStorage.removeItem("userEmail"),updateUI(!1)}logoutButton&&logoutButton.addEventListener("click",handleLogout),logoutButtonMobile&&logoutButtonMobile.addEventListener("click",handleLogout),showRegisterLink&&showRegisterLink.addEventListener("click",t=>{t.preventDefault(),loginSection.style.display="none",registerSection.style.display="block",hideMessages()}),showLoginLink&&showLoginLink.addEventListener("click",t=>{t.preventDefault(),registerSection.style.display="none",loginSection.style.display="block",hideMessages()});
+        navLinks.forEach(t=>{t.addEventListener("click",e=>{const n=t.getAttribute("data-section");if(n){e.preventDefault(); showPageSection(n)} else if(!t.id?.includes("logoutButton")) {console.warn("Link sin data-section:",t)}})});
+        const promoCTAButton = document.querySelector('.promo-banner .cta-button'); if(promoCTAButton) {promoCTAButton.addEventListener('click', (e) => {const sectionId = promoCTAButton.getAttribute('data-section'); if (sectionId) { e.preventDefault(); showPageSection(sectionId);}});}
+        mobileMenuButton&&mobileMenu&&mobileMenuButton.addEventListener("click",()=>{const t="true"===mobileMenuButton.getAttribute("aria-expanded");mobileMenuButton.setAttribute("aria-expanded",!t),mobileMenu.classList.toggle("hidden");const e=mobileMenuButton.querySelector("svg.block"),n=mobileMenuButton.querySelector("svg.hidden");e&&e.classList.toggle("hidden"),n&&n.classList.toggle("hidden")});
+
+        // --- INICIALIZACIÓN ---
+        document.addEventListener("DOMContentLoaded",()=>{const t=document.getElementById("current-year");t&&(t.textContent=(new Date).getFullYear());const e="true"===localStorage.getItem("userLoggedIn");updateUI(e);
+            if (e && document.getElementById('home-section').style.display !== 'none') {
+                 createCarouselSlides();
+                 renderCategories(); // Renderizar categorías
+                 if (featuredProductsContainer && featuredProductsContainer.children.length === 0) {
+                     renderFeaturedProducts(featuredProductsContainer);
+                 }
+            }
+        });
+    </script>
+</body>
+</html>
