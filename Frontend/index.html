@@ -14,35 +14,35 @@
     <style>
         /* Estilos generales */
         body { font-family: 'Inter', sans-serif; color: #1f2937; line-height: 1.6; position: relative; min-height: 100vh; }
-        body::before { content: ""; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-image: url('images/fondo-principal.jpg'); background-size: cover; background-position: center; filter: blur(5px); opacity: 0.6; z-index: -1; }
-        body > .flex-grow { position: relative; z-index: 1; background-color: rgba(243, 244, 246, 0.85); }
-        .card-img-container{height:200px;display:flex;align-items:center;justify-content:center;background-color:#fff;overflow:hidden;padding:.5rem}
+        body::before { content: ""; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-image: url('images/fondo-principal.jpg'); background-size: cover; background-position: center; filter: blur(5px); opacity: 0.9; z-index: -1; }
+        body > .flex-grow { position: relative; z-index: 1; background-color: rgba(205, 206, 207, 0.836); }
+        .card-img-container{height:300px;display:flex;align-items:center;justify-content:center;background-color:#05050596;overflow:hidden;padding:.5rem}
         .card-img-top{max-height:100%;max-width:100%;object-fit:contain;display:block}
         .message{padding:1rem;margin-bottom:1rem;border-radius:.375rem;font-weight:500;display:none;border:1px solid transparent}
         .message-error{background-color:#fee2e2;color:#b91c1c;border-color:#fecaca}
         .message-success{background-color:#dcfce7;color:#166534;border-color:#bbf7d0}
         .clickable-product,.buy-button-grid, .category-card, .admin-action-button, .cta-button{cursor:pointer}
-        .product-detail-container{display:flex;flex-direction:column;align-items:center;gap:1.5rem;padding:1.5rem;background-color:#fff;border-radius:.5rem;box-shadow:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -2px rgba(0,0,0,.1);max-width:56rem;margin:auto}
+        .product-detail-container{display:flex;flex-direction:column;align-items:center;gap:1.5rem;padding:1.5rem;background-color:#e4e6ee;border-radius:.5rem;box-shadow:0 4px 6px -1px rgb(0, 0, 0),0 2px 4px -2px rgb(0, 0, 0);max-width:56rem;margin:auto} /* BANNER COMPRA PAYPAL */
         @media (min-width:768px){.product-detail-container{flex-direction:row;align-items:flex-start;padding:2rem}}
-        .product-detail-image-container{width:100%;max-width:350px;flex-shrink:0;background-color:#fff;border-radius:.375rem;display:flex;align-items:center;justify-content:center;padding:1rem;border:1px solid #e5e7eb}
+        .product-detail-image-container{width:100%;max-width:350px;flex-shrink:0;background-color:#181717;border-radius:.375rem;display:flex;align-items:center;justify-content:center;padding:1rem;border:1px solid #e5e7eb}
         .product-detail-image{max-width:100%;max-height:400px;object-fit:contain}
         .product-detail-info{flex-grow:1;width:100%}
         #payment-button-container{margin-top:1.5rem;min-height:50px;position:relative}
         #payment-processing-message{margin-top:1rem;font-style:italic;color:#4b5563;text-align:center}
         h2, h3{color:#111827}
-        .promo-banner{background:linear-gradient(to right,#1e3a8a,#3b82f6);color:#fff;padding:2rem 1rem;border-radius:.5rem;text-align:center;margin-bottom:2rem}
-        .promo-banner h3{font-size:1.5rem;font-weight:700;margin-bottom:.5rem;color:#fff}
+        .promo-banner{background:linear-gradient(to right,#fa8f02,#0052d6);color:#fff;padding:2rem 1rem;border-radius:.5rem;text-align:center;margin-bottom:2rem}
+        .promo-banner h3{font-size:1.5rem;font-weight:700;margin-bottom:.5rem;color:#ffffff}
         .promo-banner p{margin-bottom:1rem;font-size:1rem}
-        .promo-banner .cta-button{background-color:#fff;color:#1e3a8a;padding:.6rem 1.5rem;border-radius:.375rem;font-weight:600;text-decoration:none;display:inline-block;transition:background-color .2s ease,color .2s ease}
+        .promo-banner .cta-button{background-color:#42f70b;color:#1e3a8a;padding:.6rem 1.5rem;border-radius:.375rem;font-weight:600;text-decoration:none;display:inline-block;transition:background-color .2s ease,color .2s ease}
         .promo-banner .cta-button:hover{background-color:#f3f4f6}
-        .carousel-container{max-width:800px;margin:2rem auto;position:relative;overflow:hidden;border-radius:.5rem;box-shadow:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -1px rgba(0,0,0,.06);background-color:#fff}
+        .carousel-container{max-width:800px;margin:2rem auto;position:relative;overflow:hidden;border-radius:.5rem;box-shadow:0 4px 6px -1px rgba(0, 0, 0, 0.952),0 2px 4px -1px rgba(0,0,0,.06);background-color:#fff}
         .carousel-slides{display:flex;transition:transform .5s ease-in-out;background-color:#f9fafb}
         .carousel-slide{min-width:100%;box-sizing:border-box;text-align:center;padding:1rem;display:none;flex-direction:column;align-items:center;justify-content:center;height:300px}
         .carousel-slide.active{display:flex}
         .carousel-slide img{max-height:80%;max-width:90%;object-fit:contain;margin-bottom:.5rem}
         .carousel-slide p{font-weight:500;color:#374151;font-size:.875rem;margin-top:auto}
         .carousel-button{position:absolute;top:50%;transform:translateY(-50%);background-color:rgba(0,0,0,.4);color:#fff;border:none;padding:.5rem .8rem;cursor:pointer;border-radius:50%;z-index:10;font-size:1rem;width:40px;height:40px;display:flex;align-items:center;justify-content:center;transition:background-color .2s ease}
-        .carousel-button:hover{background-color:rgba(0,0,0,.7)}
+        .carousel-button:hover{background-color:rgb(0, 0, 0)}
         .carousel-button.prev{left:10px} .carousel-button.next{right:10px}
         #categories-section {margin-top: 3rem; margin-bottom: 3rem;}
         .category-grid {display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;}
