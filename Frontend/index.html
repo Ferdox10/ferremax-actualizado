@@ -246,17 +246,19 @@
 
     <script>
         "use strict";
-        console.log("--- Script Ferremax V18 (Wompi-Config COP) Iniciado ---");
+        console.log("--- Script Ferremax V19 (Conectado a Render) Iniciado ---");
 
-        // Variables globales para guardar la configuración obtenida del backend
+        // Variables globales para configuración (se llenarán desde el backend)
         let wompiPublicKey = null;
         let frontendBaseUrl = null;
-        let configLoaded = false; // Flag para saber si la config ya cargó
+        let configLoaded = false;
+
+        // *** CAMBIO CLAVE: URL del Backend ahora apunta a Render ***
+        const API_URL = "https://ferremax-actualizado.onrender.com"; // ¡URL pública de tu backend!
 
         // Constantes y Variables Globales (DOM, etc.)
         const loginSection = document.getElementById("login-section"), registerSection = document.getElementById("register-section"), mainContent = document.getElementById("main-content"), pageContent = document.getElementById("page-content"), featuredProductsContainer = document.getElementById("featured-products-container"), productsDisplayArea = document.getElementById("products-display-area"), contactForm = document.getElementById("contactForm"), contactMessageResponseDiv = document.getElementById("contact-message-response"), contactSubmitButton = document.getElementById("contactSubmitButton"), loginForm = document.getElementById("loginForm"), registerForm = document.getElementById("registerForm"), logoutButton = document.getElementById("logoutButton"), logoutButtonMobile = document.getElementById("logoutButtonMobile"), showRegisterLink = document.getElementById("show-register"), showLoginLink = document.getElementById("show-login"), navLinks = document.querySelectorAll(".admin-nav-item"), mobileMenuButton = document.getElementById("mobile-menu-button"), mobileMenu = document.getElementById("mobile-menu"), loginMessageDiv = document.getElementById("login-message"), registerMessageDiv = document.getElementById("register-message"), categoryGridContainer = document.getElementById('category-grid-container'), adminMenuDesktopContainer = document.getElementById('admin-menu-desktop-container'), adminMenuDesktopButton = document.getElementById('admin-menu-desktop-button'), adminMenuDesktopDropdown = document.getElementById('admin-menu-desktop-dropdown'), adminMenuMobileContainer = document.getElementById('admin-menu-mobile-container'), adminSectionContainer = document.getElementById('admin-section-container'), adminProductsSection = document.getElementById('admin-products-section'), adminPersonalizeSection = document.getElementById('admin-personalize-section'), adminProductsTableContainer = document.getElementById('admin-products-table-container'), adminProductsMessageDiv = document.getElementById('admin-products-message'), addProductButton = document.getElementById('add-product-button'), adminProductFormContainer = document.getElementById('admin-add-edit-product-form-container'), adminProductForm = document.getElementById('admin-product-form'), adminCancelButton = document.getElementById('admin-cancel-edit-product'), adminProductListContainer = document.getElementById('admin-product-list-container'), adminProductFormMessageDiv = document.getElementById('admin-product-form-message'), adminCategorySelect = document.getElementById('admin-product-category'), adminFormTitle = document.getElementById('admin-form-title'), adminProductIdInput = document.getElementById('admin-product-id'), adminSaveButton = document.getElementById('admin-save-product-button'), adminPersonalizeMessageDiv = document.getElementById('admin-personalize-message'), colorPrimaryInput = document.getElementById('setting-colorPrimary'), colorSecondaryInput = document.getElementById('setting-colorSecondary'), colorAccentInput = document.getElementById('setting-colorAccent'), welcomeTitleInput = document.getElementById('setting-welcomeTitle'), promoBannerTitleInput = document.getElementById('setting-promoBannerTitle'), promoBannerTextInput = document.getElementById('setting-promoBannerText'), saveColorsButton = document.getElementById('save-colors-button'), saveTextsButton = document.getElementById('save-texts-button'), mainWelcomeTitle = document.getElementById('main-welcome-title'), mainPromoTitle = document.getElementById('main-promo-title'), mainPromoText = document.getElementById('main-promo-text'), carouselSlidesContainer = document.querySelector('.carousel-slides'), carouselPrevButton = document.querySelector('.carousel-button.prev'), carouselNextButton = document.querySelector('.carousel-button.next');
         const cartSection = document.getElementById('cart-section'), cartItemsContainer = document.getElementById('cart-items-container'), cartSummaryAndCheckout = document.getElementById('cart-summary-and-checkout'), cartSubtotalSpan = document.getElementById('cart-subtotal'), cartTotalSpan = document.getElementById('cart-total'), cartItemCountDesktop = document.getElementById('cart-item-count-desktop'), cartItemCountMobileIcon = document.getElementById('cart-item-count-mobile-icon'), cartItemCountMobileMenu = document.getElementById('cart-item-count-mobile-menu'), checkoutButton = document.getElementById('checkout-button'), paymentButtonContainer = document.getElementById('payment-button-container'), cartCheckoutMessage = document.getElementById('payment-result-message'), cartMessageDiv = document.getElementById('cart-message');
-        const API_URL = "http://localhost:4000";
         const CART_STORAGE_KEY = 'ferremaxCart';
         let allProducts = [];
         let productsLoaded = false;
@@ -267,12 +269,12 @@
         const SLIDE_INTERVAL_TIME = 4000;
         let slides = [];
 
-        // --- Funciones Auxiliares (Sin cambios) ---
+        // --- Funciones Auxiliares ---
         function showMessage(element, message, isError = true) { if (!element) { console.warn("showMessage: Elemento nulo."); return; } element.textContent = message; element.className = `message ${isError ? 'message-error' : 'message-success'}`; element.style.display = "block"; const persistentIds = ["admin-products-message", "admin-product-form-message", "admin-personalize-message", "payment-result-message", "cart-message"]; if (!persistentIds.includes(element.id)) { setTimeout(() => { if (element && element.style.display !== 'none' && element.textContent === message) { element.style.display = 'none'; } }, 4000); } }
         function hideMessages(specificElement = null) { if (specificElement) { if (specificElement.style) specificElement.style.display = 'none'; } else { document.querySelectorAll(".message").forEach(msg => { const persistentIds = ["admin-products-message", "admin-product-form-message", "admin-personalize-message", "payment-result-message", "cart-message"]; if (!persistentIds.includes(msg.id)) { msg.style.display = 'none'; } }); } }
         function darkenColor(hex, percent) { try { hex = hex.replace(/^#/, ""); if (hex.length === 3) hex = hex.split("").map(c => c + c).join(""); let r = parseInt(hex.substring(0, 2), 16); let g = parseInt(hex.substring(2, 4), 16); let b = parseInt(hex.substring(4, 6), 16); const factor = 1 - percent / 100; r = Math.max(0, Math.floor(r * factor)); g = Math.max(0, Math.floor(g * factor)); b = Math.max(0, Math.floor(b * factor)); return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`; } catch (e) { console.error("Error darkenColor:", hex, e); return hex; } }
 
-        // --- Funciones del Carrito (Sin cambios) ---
+        // --- Funciones del Carrito ---
         function getCart() { const c = localStorage.getItem(CART_STORAGE_KEY); try { const p = c ? JSON.parse(c) : []; return Array.isArray(p) ? p.filter(item => item && typeof item.productId !== 'undefined' && item.productId !== null) : []; } catch (e) { console.error("Error getCart:", e); localStorage.removeItem(CART_STORAGE_KEY); return []; } }
         function saveCart(cart) { if (!Array.isArray(cart)) { console.warn("saveCart: Intento de guardar algo que no es un array."); return; } localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart)); updateCartIcon(); if (cartSection && cartSection.style.display !== 'none') { renderCartPage(); } }
         function addToCart(productId, quantity = 1, buttonElement = null) { console.log(`[Cart] Add: ${productId} Qty: ${quantity}`); if (!allProducts || allProducts.length === 0) { console.error("Cart Error: Products not loaded."); showMessage(cartMessageDiv || pageContent.querySelector('.message') || pageContent, 'Error: Info producto no disponible.', true); return; } let cart = getCart(); const product = allProducts.find(p => p.ID_Producto == productId); if (!product) { console.error("Cart Error: Product not found:", productId); showMessage(cartMessageDiv || pageContent.querySelector('.message') || pageContent, 'Error: Producto no encontrado.', true); return; } const stock = product.cantidad ?? 0; const existingItemIndex = cart.findIndex(item => item.productId == productId); if (stock <= 0 && existingItemIndex === -1) { showMessage(cartMessageDiv || pageContent.querySelector('.message') || pageContent, `"${product.Nombre}" agotado.`, true); if (buttonElement) { buttonElement.disabled = true; buttonElement.innerHTML = '<i class="fas fa-times-circle mr-2"></i>Sin Stock'; buttonElement.classList.add('btn-gray', 'cursor-not-allowed'); buttonElement.classList.remove('btn-primary'); } return; } let addedQty = 0; if (existingItemIndex > -1) { const currentQty = cart[existingItemIndex].quantity; const potentialQty = currentQty + quantity; if (potentialQty > stock) { addedQty = stock - currentQty; if (addedQty > 0) { cart[existingItemIndex].quantity = stock; showMessage(cartMessageDiv || pageContent.querySelector('.message') || pageContent, `Stock máx (${stock}) alcanzado para "${product.Nombre}".`, true); } else { showMessage(cartMessageDiv || pageContent.querySelector('.message') || pageContent, `Ya tienes el stock máx (${stock}) de "${product.Nombre}".`, true); } } else { cart[existingItemIndex].quantity = potentialQty; addedQty = quantity; } } else { if (quantity > stock) { addedQty = stock; if (addedQty > 0) { cart.push({ productId: parseInt(productId), quantity: stock, price: product.precio_unitario, name: product.Nombre, imageUrl: product.imagen_url, stock: stock }); showMessage(cartMessageDiv || pageContent.querySelector('.message') || pageContent, `Stock insuf (${stock}) para "${product.Nombre}". Añadido: ${addedQty}.`, true); } else { showMessage(cartMessageDiv || pageContent.querySelector('.message') || pageContent, `"${product.Nombre}" agotado.`, true); } } else { addedQty = quantity; cart.push({ productId: parseInt(productId), quantity: quantity, price: product.precio_unitario, name: product.Nombre, imageUrl: product.imagen_url, stock: stock }); } } if (addedQty > 0) { saveCart(cart); if (buttonElement) { const originalHtml = buttonElement.innerHTML; const originalClasses = buttonElement.className; buttonElement.disabled = true; buttonElement.innerHTML = '<i class="fas fa-check mr-1"></i> Añadido'; buttonElement.classList.add('added-feedback'); setTimeout(() => { if (buttonElement?.classList.contains('added-feedback')) { buttonElement.innerHTML = originalHtml; buttonElement.className = originalClasses; const latestP = allProducts.find(p => p.ID_Producto == productId); const latestC = getCart().find(i => i.productId == productId); const currentStock = latestP?.cantidad ?? 0; const cartQty = latestC?.quantity ?? 0; buttonElement.disabled = (cartQty >= currentStock); if (buttonElement.disabled) { buttonElement.innerHTML = '<i class="fas fa-times-circle mr-2"></i>Sin Stock'; buttonElement.classList.add('btn-gray', 'cursor-not-allowed'); buttonElement.classList.remove('btn-primary'); } } }, 1500); } else { showMessage(cartMessageDiv || pageContent.querySelector('.message') || pageContent, '¡Producto añadido!', false); } } }
@@ -282,7 +284,7 @@
         function updateCartIcon() { const cart = getCart(); const totalItems = cart.reduce((sum, item) => sum + (parseInt(item.quantity) || 0), 0); const counts = [cartItemCountDesktop, cartItemCountMobileIcon, cartItemCountMobileMenu]; counts.forEach(el => { if (el) { el.textContent = totalItems; el.style.display = totalItems > 0 ? 'inline-block' : 'none'; } }); }
         function renderCartPage() { console.log("[Cart] Rendering page..."); if (!cartItemsContainer || !cartSummaryAndCheckout || !cartSubtotalSpan || !cartTotalSpan) { console.error("Cart Render: Missing DOM elements"); if(pageContent) pageContent.innerHTML = '<p class="text-red-600 text-center p-4">Error interno al mostrar el carrito.</p>'; return; } const cart = getCart(); console.log("[Cart] Data from getCart() for render:", JSON.stringify(cart)); cartItemsContainer.innerHTML = ""; if (cart.length === 0) { cartItemsContainer.innerHTML = '<p class="text-center text-gray-500 py-4">Tu carrito está vacío.</p>'; cartSummaryAndCheckout.style.display = 'none'; if (checkoutButton) checkoutButton.style.display = 'none'; } else { const { subtotal, total } = calculateCartTotals(); cart.forEach(item => { if (!item || typeof item.productId === 'undefined' || item.productId === null) { console.warn("[Cart Render] Ignorando item inválido:", item); return; } const imageUrl = item.imageUrl || `https://placehold.co/60x60/e5e7eb/4b5563?text=NI`; const imageOnError = `this.onerror=null;this.src='https://placehold.co/60x59/fecaca/b91c1c?text=Err';`; const priceF = (typeof item.price === 'number' ? item.price.toFixed(2) : 'N/A'); const itemTotalF = (typeof item.price === 'number' && typeof item.quantity === 'number' ? (item.price * item.quantity).toFixed(2) : 'N/A'); const stock = item.stock || 0; const itemDiv = document.createElement('div'); itemDiv.className = 'cart-item flex items-center justify-between border-b py-4 last:border-b-0 flex-wrap gap-2'; itemDiv.innerHTML = `<div class="flex items-center flex-grow min-w-[200px]"><img src="${imageUrl}" alt="${item.name || ''}" onerror="${imageOnError}"><div><h4 class="font-semibold text-gray-800">${item.name || 'N/A'}</h4><p class="text-sm text-gray-600">Precio: $${priceF}</p><p class="text-xs text-gray-500 mt-1">Stock: ${stock}</p></div></div><div class="flex items-center space-x-2 sm:space-x-3"><label for="qty-${item.productId}" class="sr-only">Cantidad</label><input type="number" id="qty-${item.productId}" value="${item.quantity}" min="1" max="${stock}" data-product-id-qty="${item.productId}" class="border rounded px-1 py-1 w-14 sm:w-16 text-center cart-item-qty-input" aria-label="Cantidad"><p class="font-semibold w-20 text-right">$${itemTotalF}</p><button class="remove-item-btn cart-item-remove-button" data-product-id-remove="${item.productId}" title="Eliminar"><i class="fas fa-trash-alt pointer-events-none"></i></button></div>`; cartItemsContainer.appendChild(itemDiv); }); cartSubtotalSpan.textContent = `$${subtotal.toFixed(2)}`; cartTotalSpan.textContent = `$${total.toFixed(2)}`; cartSummaryAndCheckout.style.display = 'block'; if (checkoutButton) { checkoutButton.style.display = 'block'; checkoutButton.disabled = false; checkoutButton.innerHTML = 'Proceder al Pago'; if(cartCheckoutMessage) hideMessages(cartCheckoutMessage); } else if (checkoutButton) { checkoutButton.style.display = 'none'; } hideMessages(cartMessageDiv); } }
 
-        // --- Funciones de Renderizado Público (Sin cambios) ---
+        // --- Funciones de Renderizado Público ---
         function renderProductCard(product, isFeatured = false) { const div = document.createElement("div"); div.className = `bg-white rounded-lg shadow-md overflow-hidden flex flex-col transition transform hover:scale-105 duration-300 border border-gray-200`; const imageUrl = product.imagen_url || `https://placehold.co/300x200/e5e7eb/4b5563?text=NI`; const imageOnError = `this.onerror=null;this.src='https://placehold.co/300x199/fecaca/b91c1c?text=Err';`; const price = typeof product.precio_unitario === 'number' ? `$${product.precio_unitario.toFixed(2)}` : 'N/A'; const description = product.Descripcion ? (isFeatured ? product.Descripcion.substring(0, 50) + (product.Descripcion.length > 50 ? '...' : '') : product.Descripcion) : (isFeatured ? '' : 'N/A'); const stock = product.cantidad ?? 0; const isOutOfStock = stock <= 0; div.innerHTML = `<div class="card-img-container product-detail-link cursor-pointer" data-product-id-detail="${product.ID_Producto}"><img src="${imageUrl}" class="card-img-top" alt="${product.Nombre || ''}" onerror="${imageOnError}"></div><div class="p-4 flex flex-col flex-grow"><h5 class="text-lg font-semibold text-gray-800 truncate mb-1 product-detail-link cursor-pointer" title="${product.Nombre || ''}" data-product-id-detail="${product.ID_Producto}">${product.Nombre || 'N/A'}</h5>${!isFeatured && description !== 'N/A' ? `<p class="text-gray-600 text-sm mb-2 mt-1 flex-grow min-h-[40px]">${description}</p>` : ''}<p class="text-xl font-bold product-price mt-auto mb-3">${price}</p><button class="add-to-cart-button mt-auto w-full btn ${isOutOfStock ? 'btn-gray cursor-not-allowed' : 'btn-primary'}" data-product-id-add="${product.ID_Producto}" ${isOutOfStock ? 'disabled title="Sin stock"' : ''}>${isOutOfStock ? '<i class="fas fa-times-circle mr-2"></i>Sin Stock' : '<i class="fas fa-cart-plus mr-2"></i>Añadir'}</button></div>`; return div; }
         function renderProductGrid(container) { if (!container) return; container.innerHTML = ""; container.className = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"; if (!allProducts || allProducts.length === 0) { container.innerHTML = '<p class="col-span-full text-center text-gray-500 p-4">No hay productos disponibles.</p>'; return; } allProducts.forEach(p => container.appendChild(renderProductCard(p, false))); }
         function renderFeaturedProducts(container) { if (!container) return; container.innerHTML = ""; container.className = "grid grid-cols-1 md:grid-cols-3 gap-6"; if (!allProducts || allProducts.length === 0) { container.innerHTML = '<p class="col-span-full text-center text-gray-500 p-4">No hay productos destacados.</p>'; return; } const featured = allProducts.slice(0, 3); featured.forEach(p => container.appendChild(renderProductCard(p, true))); }
@@ -290,103 +292,52 @@
         function renderProductDetail(container, productId) { if (!container) return; container.innerHTML = '<p class="text-center text-gray-500 p-4">Cargando detalle del producto...</p>'; container.className = ""; const product = allProducts.find(p => p.ID_Producto == productId); if (product) { renderProductDetailContent(container, product); } else { fetch(`${API_URL}/api/productos/${productId}`).then(response => { if (!response.ok) { return response.json().then(err => { throw new Error(err.message || `Error ${response.status}`) }); } return response.json(); }).then(p => { if (!p || !p.ID_Producto) throw new Error('Producto no hallado en la respuesta.'); p.precio_unitario = parseFloat(p.precio_unitario) || 0; p.cantidad = parseInt(p.cantidad) || 0; renderProductDetailContent(container, p); }).catch(error => { console.error("Error cargando detalle producto:", error); container.innerHTML = `<p class="text-red-600 text-center p-4">Error al cargar el producto (${error.message}).</p><div class="text-center mt-4"><button id="back-to-products-error" class="btn btn-gray">Volver a Productos</button></div>`; const btnErr = container.querySelector("#back-to-products-error"); if (btnErr) { btnErr.addEventListener("click", () => showPageSection("products")); } }); } }
         function renderCategories() { if (!categoryGridContainer) return; categoryGridContainer.innerHTML = ""; categoriesData.forEach(cat => { const card = document.createElement('div'); card.className = 'category-card'; card.setAttribute('data-category-id', cat.id); card.innerHTML = `<i class="${cat.icon}"></i><span>${cat.name}</span>`; categoryGridContainer.appendChild(card); }); }
 
-        // --- Funciones del Carrusel (Sin cambios) ---
+        // --- Funciones del Carrusel ---
         function createCarouselSlides() { if (!carouselSlidesContainer || !allProducts || allProducts.length === 0) { console.log("Carrusel: No hay datos o contenedor."); if(carouselSlidesContainer) carouselSlidesContainer.innerHTML = '<p class="text-gray-500 p-4 text-center">No hay imágenes para mostrar.</p>'; if(carouselPrevButton) carouselPrevButton.style.display = 'none'; if(carouselNextButton) carouselNextButton.style.display = 'none'; return; } const productsForCarousel = allProducts.slice(0, 6); if (carouselSlidesContainer.children.length > 0 && slides.length === productsForCarousel.length) { return; } console.log("Creando carrusel..."); carouselSlidesContainer.innerHTML = ""; slides = []; if (productsForCarousel.length === 0) { carouselSlidesContainer.innerHTML = '<p class="text-gray-500 p-4 text-center">No hay imágenes para mostrar.</p>'; if(carouselPrevButton) carouselPrevButton.style.display = 'none'; if(carouselNextButton) carouselNextButton.style.display = 'none'; return; } productsForCarousel.forEach((p, i) => { const slide = document.createElement('div'); slide.className = 'carousel-slide'; slide.setAttribute('data-index', i); const imgUrl = p.imagen_url || `https://placehold.co/400x200/e5e7eb/4b5563?text=Producto`; const imgErr = `this.onerror=null;this.src='https://placehold.co/400x199/fecaca/b91c1c?text=Error';`; slide.innerHTML = `<img src="${imgUrl}" alt="${p.Nombre || ''}" onerror="${imgErr}"><p>${p.Nombre || 'Producto sin nombre'}</p>`; if (i === 0) slide.classList.add('active'); carouselSlidesContainer.appendChild(slide); slides.push(slide); }); if (slides.length > 1) { startSlideInterval(); if (carouselPrevButton) carouselPrevButton.style.display = 'flex'; if (carouselNextButton) carouselNextButton.style.display = 'flex'; } else { stopSlideInterval(); if (carouselPrevButton) carouselPrevButton.style.display = 'none'; if (carouselNextButton) carouselNextButton.style.display = 'none'; } showSlide(currentSlideIndex); }
         function showSlide(index) { if (!carouselSlidesContainer || slides.length === 0) return; if (index >= slides.length) currentSlideIndex = 0; else if (index < 0) currentSlideIndex = slides.length - 1; else currentSlideIndex = index; slides.forEach((slide, i) => slide.classList.toggle('active', i === currentSlideIndex)); }
         function nextSlide() { showSlide(currentSlideIndex + 1); } function prevSlide() { showSlide(currentSlideIndex - 1); } function startSlideInterval() { stopSlideInterval(); if (slides.length > 1) { slideInterval = setInterval(nextSlide, SLIDE_INTERVAL_TIME); } } function stopSlideInterval() { clearInterval(slideInterval); }
 
-        // --- Funciones de Carga de Datos (Sin cambios) ---
+        // --- Funciones de Carga de Datos ---
         async function loadAndStorePublicProducts() { if (productsLoaded && allProducts.length > 0) return true; console.log("Cargando productos públicos..."); try { const response = await fetch(`${API_URL}/api/productos`); if (!response.ok) throw new Error(`HTTP ${response.status}`); let products = await response.json(); allProducts = products.map(p => ({ ...p, precio_unitario: parseFloat(p.precio_unitario) || 0, cantidad: parseInt(p.cantidad) || 0 })); productsLoaded = true; console.log(`Productos públicos cargados: ${allProducts.length}`); updateCartIcon(); return true; } catch (error) { console.error("Error cargando productos públicos:", error); allProducts = []; productsLoaded = false; if (productsDisplayArea) productsDisplayArea.innerHTML = '<p class="col-span-full text-red-600 p-4 text-center">Error al cargar productos.</p>'; if (featuredProductsContainer) featuredProductsContainer.innerHTML = '<p class="col-span-full text-red-600 p-4 text-center">Error al cargar destacados.</p>'; return false; } }
         async function loadSiteSettings() { console.log("Cargando settings del sitio..."); try { const headers = { 'x-admin-simulated': 'true' }; const response = await fetch(`${API_URL}/api/admin/settings`, { headers }); if (!response.ok) throw new Error(`HTTP ${response.status}`); const data = await response.json(); if (data.success && data.settings) { console.log("Settings cargados:", data.settings); currentSettings = data.settings; applySiteSettings(); return true; } else { throw new Error(data.message || "Respuesta inválida al cargar settings."); } } catch (error) { console.error("Error loadSiteSettings:", error); currentSettings = {}; applySiteSettings(); return false; } }
         async function loadAdminProducts() { if (!adminProductsTableContainer) { console.error("Error: Contenedor tabla admin no encontrado."); return; } adminProductsTableContainer.innerHTML = '<p class="p-4 text-gray-500 text-center">Cargando productos (admin)...</p>'; hideMessages(adminProductsMessageDiv); console.log("Cargando productos para admin..."); try { const headers = { 'x-admin-simulated': 'true' }; const response = await fetch(`${API_URL}/api/admin/products`, { headers }); if (!response.ok) { const errData = await response.json().catch(() => ({ message: `Error ${response.status}` })); throw new Error(errData.message || `Error ${response.status}`); } const products = await response.json(); console.log(`Productos admin cargados: ${products?.length || 0}`); renderAdminProductTable(products); } catch (error) { console.error("Error loadAdminProducts:", error); showMessage(adminProductsMessageDiv, `Error carga admin: ${error.message}`, true); adminProductsTableContainer.innerHTML = '<p class="p-4 text-red-600 text-center">No se pudieron cargar los productos.</p>'; } }
         async function loadCategoriesIntoSelect() { if (!adminCategorySelect) return; if (adminCategorySelect.options.length > 1 && !adminCategorySelect.querySelector('option[value="error"]')) { return; } console.log("Cargando categorías en select admin..."); try { const response = await fetch(`${API_URL}/api/categories`); if (!response.ok) throw new Error(`HTTP ${response.status}`); const categories = await response.json(); adminCategorySelect.innerHTML = '<option value="">-- Selecciona Categoría --</option>'; categories.forEach(cat => { const option = document.createElement('option'); option.value = cat.ID_Categoria; option.textContent = cat.Nombre; adminCategorySelect.appendChild(option); }); console.log("Categorías cargadas en select."); } catch (error) { console.error("Error loadCategoriesIntoSelect:", error); adminCategorySelect.innerHTML = '<option value="error">Error al cargar categorías</option>'; showMessage(adminProductFormMessageDiv, 'Error: No se pudieron cargar las categorías.', true); } }
 
-        // --- Funciones de Navegación y UI (Sin cambios) ---
+        // --- Funciones de Navegación y UI ---
         async function showPageSection(sectionId, detailId = null) { console.log(`Nav -> ${sectionId}${detailId ? ` (${detailId})` : ''}`); hideMessages(); const publicSections = ['home', 'products', 'contact', 'policies', 'cart']; const adminSubSections = ['admin-products', 'admin-personalize']; let needsPublicProducts = ['home', 'products', 'cart'].includes(sectionId) || (sectionId === 'products' && detailId); const allSections = document.querySelectorAll('#page-content > div[id$="-section"], #page-content > section[id$="-section"]'); allSections.forEach(sec => { if (sec) sec.style.display = 'none'; }); if (adminSectionContainer) adminSectionContainer.style.display = "none"; if (adminProductsSection) adminProductsSection.style.display = "none"; if (adminPersonalizeSection) adminPersonalizeSection.style.display = "none"; let productsOK = true; if (needsPublicProducts && !productsLoaded) { console.log(`Cargando productos públicos para ${sectionId}...`); productsOK = await loadAndStorePublicProducts(); } if (sectionId === 'admin-personalize' && (!currentSettings || Object.keys(currentSettings).length === 0)) { console.log("Cargando settings para admin-personalize..."); await loadSiteSettings(); } if (sectionId === 'admin-products') { console.log("Cargando productos para admin-products..."); await loadAdminProducts(); } let sectionToShow; if (adminSubSections.includes(sectionId)) { console.log(`Mostrando sección ADMIN: ${sectionId}`); if (adminSectionContainer) adminSectionContainer.style.display = "block"; sectionToShow = document.getElementById(`${sectionId}-section`); if (sectionToShow) { sectionToShow.style.display = "block"; if (sectionId === 'admin-products') { showAdminProductList(); } else if (sectionId === 'admin-personalize') { populatePersonalizeForm(); } } else { console.warn(`Admin section ${sectionId} not found.`); } } else if (publicSections.includes(sectionId)) { if (adminSectionContainer) adminSectionContainer.style.display = "none"; sectionToShow = document.getElementById(`${sectionId}-section`); if (sectionToShow) { sectionToShow.style.display = "block"; console.log(`Public section shown: ${sectionId}`); if (productsOK || !needsPublicProducts) { switch (sectionId) { case "home": renderFeaturedProducts(featuredProductsContainer); createCarouselSlides(); renderCategories(); applyTextSettings(currentSettings); break; case "products": if (detailId) { renderProductDetail(productsDisplayArea, detailId); } else { productsDisplayArea.className = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"; renderProductGrid(productsDisplayArea); } break; case "cart": renderCartPage(); break; } } else { console.error(`Error loading products for public section ${sectionId}.`); const errMsg = '<p class="col-span-full text-red-600 p-4 text-center">Error al cargar datos necesarios.</p>'; if (sectionId === 'products' && productsDisplayArea) productsDisplayArea.innerHTML = errMsg; if (sectionId === 'home' && featuredProductsContainer) featuredProductsContainer.innerHTML = errMsg; if (sectionId === 'cart' && cartItemsContainer) cartItemsContainer.innerHTML = errMsg; } } else { console.warn(`Public section ${sectionId} not found.`); showPageSection('home'); } } else { console.warn(`Unknown section ${sectionId}.`); showPageSection('home'); } if (mobileMenu && !mobileMenu.classList.contains('hidden')) { mobileMenu.classList.add("hidden"); if (mobileMenuButton) { mobileMenuButton.setAttribute("aria-expanded", "false"); const openIcon = mobileMenuButton.querySelector("svg.block"); const closeIcon = mobileMenuButton.querySelector("svg.hidden"); if (openIcon) openIcon.classList.remove("hidden"); if (closeIcon) closeIcon.classList.add("hidden"); } } if (adminMenuDesktopDropdown && !adminMenuDesktopDropdown.classList.contains('hidden')) { adminMenuDesktopDropdown.classList.add('hidden'); } window.scrollTo(0, 0); }
         function updateUI(isLoggedIn) { console.log("Updating UI, LoggedIn:", isLoggedIn); const userRole = localStorage.getItem('userRole'); const isAdmin = isLoggedIn && userRole === 'admin'; if (isLoggedIn) { if (loginSection) loginSection.style.display = "none"; if (registerSection) registerSection.style.display = "none"; if (mainContent) mainContent.style.display = "block"; } else { if (loginSection) loginSection.style.display = "block"; if (registerSection) registerSection.style.display = "none"; if (mainContent) mainContent.style.display = "none"; console.log("UI: Clearing cart on logout."); localStorage.removeItem(CART_STORAGE_KEY); updateCartIcon(); } if (adminMenuDesktopContainer) adminMenuDesktopContainer.style.display = isAdmin ? 'block' : 'none'; if (adminMenuMobileContainer) adminMenuMobileContainer.style.display = isAdmin ? 'block' : 'none'; console.log("UI Updated."); }
 
-        // --- Función de Checkout Wompi (Actualizada para COP) ---
+        // --- Función de Checkout Wompi (Usa config global y moneda COP) ---
         async function handleCheckout() {
             console.log(">>> [Checkout Wompi COP] Iniciando...");
-
-            // Verificar si la configuración ya cargó
-            if (!configLoaded) {
-                showMessage(cartCheckoutMessage, 'Error: La configuración de pago no ha cargado. Intenta de nuevo en unos segundos.', true);
-                console.error("Checkout Wompi Error: Configuración no cargada.");
-                return;
-            }
-             if (!wompiPublicKey || !frontendBaseUrl) {
-                showMessage(cartCheckoutMessage, 'Error: Falta configuración de pago (llave/URL).', true);
-                console.error("Checkout Wompi Error: Falta wompiPublicKey o frontendBaseUrl.");
-                return;
-            }
-
+            if (!configLoaded) { showMessage(cartCheckoutMessage, 'Error: Configuración de pago no cargada.', true); console.error("Checkout Wompi Error: Configuración no cargada."); return; }
+            if (!wompiPublicKey || !frontendBaseUrl) { showMessage(cartCheckoutMessage, 'Error: Falta configuración de pago.', true); console.error("Checkout Wompi Error: Falta wompiPublicKey o frontendBaseUrl."); return; }
             const cart = getCart();
-            if (cart.length === 0) {
-                showMessage(cartMessageDiv, 'Carrito vacío.', true);
-                return;
-            }
-
-            const { total } = calculateCartTotals(); // Total calculado
-            // *** IMPORTANTE: Para que esto funcione, 'total' DEBE estar en COP ***
-            // *** Asegúrate que los precios en la DB (`precio_unitario`) estén en COP ***
-            // *** O implementa una conversión de USD a COP aquí si los precios están en USD ***
+            if (cart.length === 0) { showMessage(cartMessageDiv, 'Carrito vacío.', true); return; }
+            const { total } = calculateCartTotals();
             console.log(`[Checkout Wompi COP] Total calculado (debe ser COP): ${total}`);
-
             const reference = `ferremax_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-            const currency = 'COP'; // *** CAMBIO: Moneda a COP ***
-            const totalInCents = Math.round(total * 100); // Convertir total COP a centavos de peso
-
-            // Usar la URL base obtenida de la configuración
+            const currency = 'COP'; // Moneda Colombiana
+            const totalInCents = Math.round(total * 100); // Centavos de Peso
             const redirectUrl = `${frontendBaseUrl}/payment-status.html`;
-
             showMessage(cartCheckoutMessage, 'Preparando checkout seguro con Wompi...', false);
-            if (checkoutButton) {
-                checkoutButton.disabled = true;
-                checkoutButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Redirigiendo...';
-            }
-
+            if (checkoutButton) { checkoutButton.disabled = true; checkoutButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Redirigiendo...'; }
             try {
                 const cartDataForBackend = cart.map(item => ({ productId: item.productId, quantity: item.quantity, price: item.price }));
                 console.log(">>> [Checkout Wompi COP] Enviando datos temporales a POST /api/wompi/temp-order");
-                const tempResponse = await fetch(`${API_URL}/api/wompi/temp-order`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ reference: reference, items: cartDataForBackend, total: total }) // Enviamos total (asumido COP)
-                });
+                const tempResponse = await fetch(`${API_URL}/api/wompi/temp-order`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reference: reference, items: cartDataForBackend, total: total }) });
                 const tempData = await tempResponse.json();
-                if (!tempResponse.ok || !tempData.success) {
-                    throw new Error(tempData.message || 'Error guardando orden temporal en backend.');
-                }
+                if (!tempResponse.ok || !tempData.success) { throw new Error(tempData.message || 'Error guardando orden temporal en backend.'); }
                 console.log(">>> [Checkout Wompi COP] Orden temporal guardada en backend para referencia:", reference);
-
-                // Inicializar Widget Wompi con COP
-                const checkout = new WidgetCheckout({
-                    currency: currency, // COP
-                    amountInCents: totalInCents, // Centavos de Peso Colombiano
-                    reference: reference,
-                    publicKey: wompiPublicKey, // Usar la variable global
-                    redirectUrl: redirectUrl,
-                    // signature: { integrity: integritySignature }
-                    // customerData: { ... }
-                });
-
+                const checkout = new WidgetCheckout({ currency: currency, amountInCents: totalInCents, reference: reference, publicKey: wompiPublicKey, redirectUrl: redirectUrl });
                 checkout.open(function (result) {
                     console.log(">>> [Checkout Wompi COP] Widget cerrado o redirigido. Resultado:", result);
-                    if (checkoutButton) {
-                        checkoutButton.disabled = false;
-                        checkoutButton.innerHTML = 'Proceder al Pago';
-                        hideMessages(cartCheckoutMessage);
-                    }
+                    if (checkoutButton) { checkoutButton.disabled = false; checkoutButton.innerHTML = 'Proceder al Pago'; hideMessages(cartCheckoutMessage); }
                 });
-
             } catch (error) {
                 console.error(">>> [Checkout Wompi COP] Error:", error);
                 showMessage(cartCheckoutMessage, `Error: ${error.message}. Intenta de nuevo.`, true);
-                if (checkoutButton) {
-                    checkoutButton.disabled = false;
-                    checkoutButton.innerHTML = 'Proceder al Pago';
-                }
+                if (checkoutButton) { checkoutButton.disabled = false; checkoutButton.innerHTML = 'Proceder al Pago'; }
             }
         }
 
@@ -394,19 +345,15 @@
         async function loadFrontendConfig() {
             console.log(">>> Cargando configuración del frontend desde el backend...");
             try {
-                const response = await fetch(`${API_URL}/api/config`);
-                if (!response.ok) {
-                    throw new Error(`Error ${response.status} al cargar configuración.`);
-                }
+                const response = await fetch(`${API_URL}/api/config`); // Llama a la ruta del backend
+                if (!response.ok) { throw new Error(`Error ${response.status} al cargar configuración.`); }
                 const configData = await response.json();
                 if (configData.success && configData.wompiPublicKey && configData.frontendBaseUrl) {
                     wompiPublicKey = configData.wompiPublicKey;
                     frontendBaseUrl = configData.frontendBaseUrl;
                     configLoaded = true;
                     console.log(">>> Configuración cargada:", { wompiPublicKey: `pub...${wompiPublicKey.slice(-6)}`, frontendBaseUrl });
-                } else {
-                    throw new Error(configData.message || "Respuesta de configuración inválida.");
-                }
+                } else { throw new Error(configData.message || "Respuesta de configuración inválida."); }
             } catch (error) {
                 console.error("!!! ERROR CRÍTICO AL CARGAR CONFIGURACIÓN FRONTEND:", error);
                 if(pageContent) {
@@ -432,14 +379,14 @@
         function populatePersonalizeForm() { if (!currentSettings) return; if (colorPrimaryInput) colorPrimaryInput.value = currentSettings.colorPrimary || '#ea580c'; if (colorSecondaryInput) colorSecondaryInput.value = currentSettings.colorSecondary || '#047857'; if (colorAccentInput) colorAccentInput.value = currentSettings.colorAccent || '#f3f4f6'; if (welcomeTitleInput) welcomeTitleInput.value = currentSettings.welcomeTitle || ''; if (promoBannerTitleInput) promoBannerTitleInput.value = currentSettings.promoBannerTitle || ''; if (promoBannerTextInput) promoBannerTextInput.value = currentSettings.promoBannerText || ''; console.log("Personalize form populated."); }
         async function saveSiteSettings(settingsToSave) { hideMessages(adminPersonalizeMessageDiv); const isColors = 'colorPrimary' in settingsToSave; const buttonId = isColors ? 'save-colors-button' : 'save-texts-button'; const button = document.getElementById(buttonId); if (button) { button.disabled = true; button.textContent = 'Guardando...'; } console.log("Saving settings:", settingsToSave); try { const headers = { 'Content-Type': 'application/json', 'x-admin-simulated': 'true' }; const response = await fetch(`${API_URL}/api/admin/settings`, { method: 'PUT', headers, body: JSON.stringify(settingsToSave) }); const data = await response.json().catch(() => ({ message: "Respuesta no JSON" })); console.log(`Save Settings Response (${response.status}):`, data); if (response.ok && data.success) { console.log("Settings saved:", data.settings); currentSettings = { ...currentSettings, ...data.settings }; applySiteSettings(); showMessage(adminPersonalizeMessageDiv, '¡Configuración guardada exitosamente!', false); } else { throw new Error(data.message || `Error ${response.status}`); } } catch (error) { console.error("Error saving settings:", error); showMessage(adminPersonalizeMessageDiv, `Error al guardar: ${error.message}`, true); } finally { if (button) { button.disabled = false; button.textContent = isColors ? 'Guardar Colores' : 'Guardar Textos'; } } }
 
-        // --- Manejadores de Eventos (Sin cambios) ---
+        // --- Manejadores de Eventos ---
         function handleLogout() { localStorage.removeItem("userLoggedIn"); localStorage.removeItem("userEmail"); localStorage.removeItem("userRole"); updateUI(false); console.log("User logged out."); showPageSection('login'); }
         function handleCategoryClick(event) { const card = event.target.closest('.category-card'); if (card) { const categoryId = card.getAttribute('data-category-id'); console.log("Category click:", categoryId); showPageSection('products'); } }
         function handleGridOrDetailClick(event) { const detailLink = event.target.closest(".product-detail-link"); const addButton = event.target.closest(".add-to-cart-button"); if (detailLink) { const productId = detailLink.dataset.productIdDetail; if (productId) { showPageSection("products", productId); } } else if (addButton) { const productId = addButton.dataset.productIdAdd; if (productId && !addButton.disabled) { addToCart(productId, 1, addButton); } } }
 
         // --- Lógica de Inicialización ---
         document.addEventListener("DOMContentLoaded", async () => {
-            console.log(">>> DOM Cargado. Iniciando App V18 (Wompi-Config COP)...");
+            console.log(">>> DOM Cargado. Iniciando App V19 (Conectado a Render)...");
             try {
                 // --- 0. Cargar configuración del frontend ANTES que nada ---
                 await loadFrontendConfig(); // Esperar a que cargue la config
@@ -496,7 +443,7 @@
                 if (isLoggedIn) { await showPageSection("home"); }
                 else { console.log(">>> Mostrando sección de Login (usuario no logueado)."); }
 
-                console.log(">>> INICIALIZACIÓN COMPLETA (V18 - Wompi-Config COP) <<<");
+                console.log(">>> INICIALIZACIÓN COMPLETA (V19 - Conectado a Render) <<<");
 
             } catch (error) {
                 console.error("!!! ERROR CRÍTICO DURANTE LA INICIALIZACIÓN !!!", error);
@@ -504,7 +451,7 @@
             }
         });
 
-        console.log("--- Script Ferremax V18 (Wompi-Config COP) Cargado ---");
+        console.log("--- Script Ferremax V19 (Conectado a Render) Cargado ---");
     </script>
 
 </body>
