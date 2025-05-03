@@ -13,15 +13,15 @@ const isProduction = process.env.NODE_ENV === 'production';
 const WOMPI_PUBLIC_KEY = process.env.WOMPI_PUBLIC_KEY;
 const WOMPI_PRIVATE_KEY = process.env.WOMPI_PRIVATE_KEY;
 const WOMPI_EVENTS_SECRET = process.env.WOMPI_EVENTS_SECRET;
-const FRONTEND_URL = process.env.FRONTEND_URL;
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://127.0.0.1:5500';
 
-if (!WOMPI_PUBLIC_KEY || !WOMPI_PRIVATE_KEY || !WOMPI_EVENTS_SECRET || !FRONTEND_URL) {
-    console.error("\n!!! ERROR FATAL: Faltan variables de entorno críticas (WOMPI_*, FRONTEND_URL) en la configuración del servicio.\n");
-    if (isProduction) process.exit(1);
+if (!WOMPI_PUBLIC_KEY || !WOMPI_PRIVATE_KEY || !WOMPI_EVENTS_SECRET) {
+    console.error("\n!!! ERROR FATAL: Variables de entorno Wompi (WOMPI_PUBLIC_KEY, WOMPI_PRIVATE_KEY, WOMPI_EVENTS_SECRET) no definidas en .env\n");
+    process.exit(1);
 }
-console.log(`--> Llave Pública Wompi (Backend): ...${WOMPI_PUBLIC_KEY ? WOMPI_PUBLIC_KEY.slice(-6) : 'NO DEFINIDA'}`);
-console.log(`--> URL Frontend para Redirección: ${FRONTEND_URL || 'NO DEFINIDA'}`);
-console.log(`--> Entorno Node.js: ${process.env.NODE_ENV || 'development (default)'}`);
+console.log(`--> Llave Pública Wompi (Backend): ...${WOMPI_PUBLIC_KEY.slice(-6)}`);
+console.log(`--> URL Frontend para Redirección: ${FRONTEND_URL}`);
+console.log(`--> Entorno Node.js: ${isProduction ? 'production' : 'development'}`);
 
 let siteSettings = {
     colorPrimary: '#ea580c',
@@ -42,18 +42,11 @@ app.use(express.urlencoded({ extended: true }));
 
 let dbPool;
 try {
-    console.log("Intentando conectar a la DB usando variables de Railway...");
-    console.log(`MYSQLHOST: ${process.env.MYSQLHOST ? 'Definido' : 'No definido'}`);
-    console.log(`MYSQLUSER: ${process.env.MYSQLUSER ? 'Definido' : 'No definido'}`);
-    console.log(`MYSQLDATABASE: ${process.env.MYSQLDATABASE ? 'Definido' : 'No definido'}`);
-    console.log(`MYSQLPORT: ${process.env.MYSQLPORT ? 'Definido' : 'No definido'}`);
-
     dbPool = mysql.createPool({
-        host: process.env.MYSQLHOST,
-        user: process.env.MYSQLUSER,
-        password: process.env.MYSQLPASSWORD,
-        database: process.env.MYSQLDATABASE,
-        port: process.env.MYSQLPORT || 3306,
+        host: process.env.DB_HOST || 'localhost',
+        user: process.env.DB_USER || 'root',
+        password: process.env.DB_PASSWORD || '',
+        database: process.env.DB_NAME || 'ferremax_db',
         waitForConnections: true,
         connectionLimit: 10,
         queueLimit: 0
@@ -61,7 +54,7 @@ try {
 
     dbPool.getConnection()
         .then(connection => {
-            console.log(`--> Conexión exitosa a la base de datos '${connection.config.database}' en ${connection.config.host}:${connection.config.port}`);
+            console.log(`--> Conexión exitosa a la base de datos '${connection.config.database}' en ${connection.config.host}`);
             connection.release();
         })
         .catch(err => {
@@ -70,7 +63,7 @@ try {
 
 } catch (error) {
     console.error("!!! Error CRÍTICO al crear el pool de conexiones a la DB:", error);
-    if (isProduction) process.exit(1);
+    process.exit(1);
 }
 
 const checkAdmin = (req, res, next) => {
@@ -84,9 +77,11 @@ const checkAdmin = (req, res, next) => {
     }
 };
 
+// --- NUEVA RUTA PARA CONFIGURACIÓN DEL FRONTEND ---
 app.get('/api/config', (req, res) => {
     console.log("--> GET /api/config");
     try {
+        // Solo enviamos las claves públicas/no sensibles necesarias
         res.status(200).json({
             success: true,
             wompiPublicKey: WOMPI_PUBLIC_KEY,
@@ -98,6 +93,7 @@ app.get('/api/config', (req, res) => {
         res.status(500).json({ success: false, message: 'Error al obtener la configuración.' });
     }
 });
+// --- FIN NUEVA RUTA ---
 
 app.post('/register', async (req, res) => {
     console.log("--> POST /register");
@@ -595,7 +591,7 @@ app.put('/api/admin/settings', checkAdmin, (req, res) => {
 
 app.listen(PORT, () => {
     console.log("\n========================================");
-    console.log(`==> Servidor Ferremax (Wompi) escuchando en puerto ${PORT}`);
+    console.log(`==> Servidor Ferremax (Wompi) escuchando en http://localhost:${PORT}`);
     console.log(`==> Modo: ${isProduction ? 'Producción' : 'Desarrollo/Sandbox'}`);
     console.log("========================================");
 });
@@ -618,4 +614,3 @@ const gracefulShutdown = async (signal) => {
 
 process.on('SIGINT', gracefulShutdown);
 process.on('SIGTERM', gracefulShutdown);
-
