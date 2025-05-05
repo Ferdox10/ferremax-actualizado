@@ -32,13 +32,22 @@ console.log(`--> URL Frontend para Redirección: ${FRONTEND_URL || 'NO DEFINIDA'
 console.log(`--> Entorno Node.js: ${process.env.NODE_ENV || 'development (default)'}`);
 
 // --- ALMACENAMIENTO SIMULADO DE CONFIGURACIÓN DEL SITIO ---
+// *** CAMBIO: Añadir campos para contacto y redes sociales a la configuración inicial/default ***
 let siteSettings = {
     colorPrimary: '#ea580c',
     colorSecondary: '#047857',
-    colorAccent: '#f3f4f6',
+    colorAccent: '#f1f5f9',
     welcomeTitle: 'Bienvenido a Ferremax',
     promoBannerTitle: '¡Ofertas Imperdibles de Temporada!',
-    promoBannerText: 'Encuentra descuentos especiales en herramientas seleccionadas. ¡No te lo pierdas!'
+    promoBannerText: 'Encuentra descuentos especiales en herramientas seleccionadas. ¡No te lo pierdas!',
+    // Nuevos campos (inicialmente vacíos o con valores por defecto)
+    contactAddress: 'Calle Falsa 123, Ciudad Ejemplo',
+    contactPhone: '+57 300 123 4567',
+    contactEmail: 'info@ferremax.example.com',
+    socialFacebook: '',
+    socialTwitter: '',
+    socialInstagram: '',
+    socialYoutube: ''
 };
 console.log("--> Configuración inicial del sitio (simulada):", siteSettings);
 
@@ -60,12 +69,12 @@ try {
         user: process.env.DB_USER,
         password: process.env.DB_PASSWORD,
         database: process.env.DB_NAME,
-        port: process.env.DB_PORT || 3306,
+        port: process.env.DB_PORT || 3306, // TiDB Cloud usa 4000, pero Render puede inyectar DB_PORT
         waitForConnections: true,
         connectionLimit: 10,
         queueLimit: 0,
         ssl: {
-             rejectUnauthorized: true // Requiere conexión segura
+             rejectUnauthorized: true // Requerido por TiDB Cloud Serverless
         }
     });
 
@@ -362,6 +371,7 @@ app.get('/api/admin/products/:id', checkAdmin, async (req, res) => {
     }
     try {
         // *** CAMBIO: Seleccionar también las nuevas columnas de imagen ***
+        // Usar SELECT * es más simple aquí ya que necesitamos todas las columnas para editar
         const [results] = await dbPool.query('SELECT * FROM producto WHERE ID_Producto = ?', [id]);
         if (results.length === 0) {
              console.log(`\t<-- Producto admin ID ${id} no encontrado para editar`);
@@ -490,36 +500,69 @@ app.delete('/api/admin/products/:id', checkAdmin, async (req, res) => {
     }
 });
 
+// *** CAMBIO: GET /api/admin/settings ahora devuelve todos los settings ***
 app.get('/api/admin/settings', checkAdmin, (req, res) => {
     console.log("--> GET /api/admin/settings");
+    // En un caso real, leerías esto de una tabla 'settings' en la DB
     console.log("\t<-- Devolviendo configuración del sitio (simulada)");
     res.status(200).json({ success: true, settings: siteSettings });
 });
 
+// *** CAMBIO: PUT /api/admin/settings ahora maneja todas las claves ***
 app.put('/api/admin/settings', checkAdmin, (req, res) => {
     console.log("--> PUT /api/admin/settings");
     const newSettings = req.body;
-    const allowedKeys = ['colorPrimary', 'colorSecondary', 'colorAccent', 'welcomeTitle', 'promoBannerTitle', 'promoBannerText'];
+    // Definir todas las claves permitidas
+    const allowedKeys = [
+        'colorPrimary', 'colorSecondary', 'colorAccent',
+        'welcomeTitle', 'promoBannerTitle', 'promoBannerText',
+        'contactAddress', 'contactPhone', 'contactEmail',
+        'socialFacebook', 'socialTwitter', 'socialInstagram', 'socialYoutube'
+    ];
     let updated = false;
+
     console.log("\tDatos recibidos para actualizar settings:", newSettings);
+
     for (const key in newSettings) {
+        // Permitir actualizar solo las claves definidas y si el valor no es undefined
         if (allowedKeys.includes(key) && newSettings[key] !== undefined) {
-            if (typeof newSettings[key] === 'string') {
-                if (key.startsWith('color') && !/^#[0-9A-Fa-f]{3}([0-9A-Fa-f]{3})?$/.test(newSettings[key])) { console.warn(`\tIgnorando setting '${key}' por formato de color inválido: ${newSettings[key]}`); continue; }
-                siteSettings[key] = newSettings[key].trim();
-                updated = true;
-                console.log(`\tSetting '${key}' actualizado a: '${siteSettings[key]}'`);
-            } else { console.warn(`\tIgnorando setting '${key}' por tipo inválido: ${typeof newSettings[key]}`); }
-        } else { console.warn(`\tIgnorando setting no permitido o indefinido: '${key}'`); }
+            // Validar formato de color si es una clave de color
+            if (key.startsWith('color') && typeof newSettings[key] === 'string' && !/^#[0-9A-Fa-f]{3}([0-9A-Fa-f]{3})?$/.test(newSettings[key])) {
+                console.warn(`\tIgnorando setting '${key}' por formato de color inválido: ${newSettings[key]}`);
+                continue; // Saltar esta clave inválida
+            }
+            // Validar URLs si son claves sociales (simple check por http/https)
+            if (key.startsWith('social') && typeof newSettings[key] === 'string' && newSettings[key] && !newSettings[key].startsWith('http')) {
+                 console.warn(`\tIgnorando setting '${key}' por formato de URL inválido (debe empezar con http/https): ${newSettings[key]}`);
+                 continue;
+            }
+
+            // Actualizar valor (quitando espacios extra si es string)
+            siteSettings[key] = typeof newSettings[key] === 'string' ? newSettings[key].trim() : newSettings[key];
+            // Guardar string vacío si el valor recibido es null o vacío (para poder borrar URLs)
+            if (siteSettings[key] === null || siteSettings[key] === undefined) {
+                siteSettings[key] = '';
+            }
+
+            updated = true;
+            console.log(`\tSetting '${key}' actualizado a: '${siteSettings[key]}'`);
+        } else {
+            console.warn(`\tIgnorando setting no permitido o indefinido: '${key}'`);
+        }
     }
+
+    // En un caso real, aquí guardarías el objeto 'siteSettings' completo en la DB
+
     if (updated) {
         console.log("\t<-- Configuración del sitio actualizada (simulada).");
+        // Devolver el objeto completo de settings actualizado
         res.status(200).json({ success: true, message: 'Configuración actualizada.', settings: siteSettings });
     } else {
         console.log("\t<-- No se realizaron cambios válidos en la configuración.");
         res.status(200).json({ success: true, message: 'No se proporcionaron datos válidos para actualizar.', settings: siteSettings });
     }
 });
+
 
 // --- INICIAR SERVIDOR ---
 app.listen(PORT, () => {
@@ -547,3 +590,4 @@ const gracefulShutdown = async (signal) => {
 };
 process.on('SIGINT', gracefulShutdown);
 process.on('SIGTERM', gracefulShutdown);
+
