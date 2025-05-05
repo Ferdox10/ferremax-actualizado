@@ -1,6 +1,7 @@
 // server.js - Servidor Backend Unificado para Ferremax con Wompi, Admin CRUD y Personalización
 // Versión que lee la configuración de la DB desde variables de entorno estándar (.env localmente)
 // Añadido SSL para conexión a TiDB Cloud
+// *** Añadido soporte para 5 imágenes de producto ***
 
 // --- DEPENDENCIAS ---
 const express = require('express');
@@ -31,7 +32,7 @@ console.log(`--> URL Frontend para Redirección: ${FRONTEND_URL || 'NO DEFINIDA'
 console.log(`--> Entorno Node.js: ${process.env.NODE_ENV || 'development (default)'}`);
 
 // --- ALMACENAMIENTO SIMULADO DE CONFIGURACIÓN DEL SITIO ---
-let siteSettings = { /* ... (sin cambios) ... */
+let siteSettings = {
     colorPrimary: '#ea580c',
     colorSecondary: '#047857',
     colorAccent: '#f3f4f6',
@@ -63,17 +64,11 @@ try {
         waitForConnections: true,
         connectionLimit: 10,
         queueLimit: 0,
-        // *** AÑADIDO: Configuración SSL requerida por TiDB Cloud ***
         ssl: {
-            // rejectUnauthorized: true // Opción más segura, requiere que el certificado CA sea válido y confiable por Node.js
-            // Si da error con true, prueba comentándola o con false SOLO para probar la conexión inicial.
-            // Para producción, lo ideal es true y si es necesario, especificar el CA de TiDB Cloud.
-            // Por ahora, un objeto vacío o { rejectUnauthorized: true } suele funcionar si el CA es estándar.
-             rejectUnauthorized: true // Empezamos con la opción segura
+             rejectUnauthorized: true // Requiere conexión segura
         }
     });
 
-    // Probar conexión inicial
     dbPool.getConnection()
         .then(connection => {
             console.log(`--> Conexión exitosa a la base de datos '${connection.config.database}' en ${connection.config.host}:${connection.config.port}`);
@@ -81,7 +76,6 @@ try {
         })
         .catch(err => {
             console.error(`!!! Error de conexión inicial a la base de datos (${err.code || 'N/A'}): ${err.message}`);
-            // Loguear detalles del error SSL si existen
             if (err.message.includes('SSL')) {
                 console.error("--> Detalle SSL:", err);
             }
@@ -93,7 +87,7 @@ try {
 }
 
 // --- MIDDLEWARE DE AUTENTICACIÓN ADMIN ---
-const checkAdmin = (req, res, next) => { /* ... (sin cambios) ... */
+const checkAdmin = (req, res, next) => {
     const isAdminSimulated = req.headers['x-admin-simulated'] === 'true';
     if (isAdminSimulated) {
         console.log(`\t[Admin Check] Acceso Permitido (Simulado) para: ${req.method} ${req.path}`);
@@ -105,7 +99,7 @@ const checkAdmin = (req, res, next) => { /* ... (sin cambios) ... */
 };
 
 // --- RUTA PARA CONFIGURACIÓN DEL FRONTEND ---
-app.get('/api/config', (req, res) => { /* ... (sin cambios) ... */
+app.get('/api/config', (req, res) => {
     console.log("--> GET /api/config");
     try {
         res.status(200).json({
@@ -121,7 +115,7 @@ app.get('/api/config', (req, res) => { /* ... (sin cambios) ... */
 });
 
 // --- RUTAS DE AUTENTICACIÓN ---
-app.post('/register', async (req, res) => { /* ... (sin cambios) ... */
+app.post('/register', async (req, res) => {
     console.log("--> POST /register");
     try {
         const { username, email, password } = req.body;
@@ -146,7 +140,8 @@ app.post('/register', async (req, res) => { /* ... (sin cambios) ... */
         res.status(500).json({ success: false, message: 'Error interno del servidor durante el registro.' });
     }
 });
-app.post('/login', async (req, res) => { /* ... (sin cambios) ... */
+
+app.post('/login', async (req, res) => {
     console.log("--> POST /login");
     try {
         const { email, password } = req.body;
@@ -182,11 +177,12 @@ app.post('/login', async (req, res) => { /* ... (sin cambios) ... */
 });
 
 // --- RUTAS PÚBLICAS (PRODUCTOS, CATEGORÍAS, CONTACTO) ---
-app.get('/api/productos', async (req, res) => { /* ... (sin cambios) ... */
+app.get('/api/productos', async (req, res) => {
     console.log("--> GET /api/productos");
     try {
+        // *** CAMBIO: Seleccionar también las nuevas columnas de imagen ***
         const [results] = await dbPool.query(
-            'SELECT ID_Producto, Nombre, Descripcion, precio_unitario, Marca, Codigo_Barras, ID_Categoria, cantidad, imagen_url FROM producto'
+            'SELECT ID_Producto, Nombre, Descripcion, precio_unitario, Marca, Codigo_Barras, ID_Categoria, cantidad, imagen_url, imagen_url_2, imagen_url_3, imagen_url_4, imagen_url_5 FROM producto'
         );
         console.log(`\t<-- Devolviendo ${results.length} productos públicos`);
         res.status(200).json(results);
@@ -195,7 +191,8 @@ app.get('/api/productos', async (req, res) => { /* ... (sin cambios) ... */
         res.status(500).json({ success: false, message: 'Error al obtener los productos.' });
     }
 });
-app.get('/api/productos/:id', async (req, res) => { /* ... (sin cambios) ... */
+
+app.get('/api/productos/:id', async (req, res) => {
     const { id } = req.params;
     console.log(`--> GET /api/productos/${id}`);
     if (isNaN(id)) {
@@ -203,8 +200,9 @@ app.get('/api/productos/:id', async (req, res) => { /* ... (sin cambios) ... */
         return res.status(400).json({ success: false, message: 'El ID del producto debe ser un número.' });
     }
     try {
+        // *** CAMBIO: Seleccionar también las nuevas columnas de imagen ***
         const [results] = await dbPool.query(
-            'SELECT ID_Producto, Nombre, Descripcion, precio_unitario, Marca, Codigo_Barras, ID_Categoria, cantidad, imagen_url FROM producto WHERE ID_Producto = ?',
+            'SELECT ID_Producto, Nombre, Descripcion, precio_unitario, Marca, Codigo_Barras, ID_Categoria, cantidad, imagen_url, imagen_url_2, imagen_url_3, imagen_url_4, imagen_url_5 FROM producto WHERE ID_Producto = ?',
             [id]
         );
         if (results.length === 0) {
@@ -218,7 +216,8 @@ app.get('/api/productos/:id', async (req, res) => { /* ... (sin cambios) ... */
         res.status(500).json({ success: false, message: 'Error al obtener el detalle del producto.' });
     }
 });
-app.get('/api/categories', async (req, res) => { /* ... (sin cambios) ... */
+
+app.get('/api/categories', async (req, res) => {
     console.log("--> GET /api/categories");
     try {
         const [results] = await dbPool.query('SELECT ID_Categoria, Nombre FROM categoria ORDER BY Nombre ASC');
@@ -229,7 +228,8 @@ app.get('/api/categories', async (req, res) => { /* ... (sin cambios) ... */
         res.status(500).json({ success: false, message: 'Error al obtener las categorías.' });
     }
 });
-app.post('/api/contact', async (req, res) => { /* ... (sin cambios) ... */
+
+app.post('/api/contact', async (req, res) => {
     console.log("--> POST /api/contact (Simulado)");
     try {
         const { name, email, subject, message } = req.body;
@@ -340,10 +340,11 @@ app.post('/api/wompi/webhook', async (req, res) => { /* ... (sin cambios) ... */
 });
 
 // --- RUTAS DE ADMINISTRACIÓN ---
-app.get('/api/admin/products', checkAdmin, async (req, res) => { /* ... (sin cambios) ... */
+app.get('/api/admin/products', checkAdmin, async (req, res) => {
     console.log("--> GET /api/admin/products");
     try {
-        const [results] = await dbPool.query('SELECT * FROM producto ORDER BY ID_Producto ASC');
+        // *** CAMBIO: Seleccionar también las nuevas columnas de imagen ***
+        const [results] = await dbPool.query('SELECT ID_Producto, Nombre, Descripcion, precio_unitario, Marca, Codigo_Barras, ID_Categoria, cantidad, imagen_url, imagen_url_2, imagen_url_3, imagen_url_4, imagen_url_5 FROM producto ORDER BY ID_Producto ASC');
         console.log(`\t<-- Devolviendo ${results.length} productos para admin`);
         res.status(200).json(results);
     } catch (error) {
@@ -351,7 +352,8 @@ app.get('/api/admin/products', checkAdmin, async (req, res) => { /* ... (sin cam
         res.status(500).json({ success: false, message: 'Error al obtener productos para administración.' });
     }
 });
-app.get('/api/admin/products/:id', checkAdmin, async (req, res) => { /* ... (sin cambios) ... */
+
+app.get('/api/admin/products/:id', checkAdmin, async (req, res) => {
     const { id } = req.params;
      console.log(`--> GET /api/admin/products/${id}`);
     if (isNaN(id)) {
@@ -359,6 +361,7 @@ app.get('/api/admin/products/:id', checkAdmin, async (req, res) => { /* ... (sin
         return res.status(400).json({ success: false, message: 'ID inválido.' });
     }
     try {
+        // *** CAMBIO: Seleccionar también las nuevas columnas de imagen ***
         const [results] = await dbPool.query('SELECT * FROM producto WHERE ID_Producto = ?', [id]);
         if (results.length === 0) {
              console.log(`\t<-- Producto admin ID ${id} no encontrado para editar`);
@@ -371,61 +374,105 @@ app.get('/api/admin/products/:id', checkAdmin, async (req, res) => { /* ... (sin
         res.status(500).json({ success: false, message: 'Error al obtener producto para editar.' });
     }
 });
-app.post('/api/admin/products', checkAdmin, async (req, res) => { /* ... (sin cambios) ... */
+
+app.post('/api/admin/products', checkAdmin, async (req, res) => {
     console.log("--> POST /api/admin/products");
     try {
-        const { Nombre, Descripcion, precio_unitario, Marca, Codigo_Barras, ID_Categoria, cantidad, imagen_url } = req.body;
+        // *** CAMBIO: Recibir las nuevas URLs de imagen del body ***
+        const { Nombre, Descripcion, precio_unitario, Marca, Codigo_Barras, ID_Categoria, cantidad, imagen_url, imagen_url_2, imagen_url_3, imagen_url_4, imagen_url_5 } = req.body;
         console.log("\tDatos recibidos para añadir:", req.body);
+
         if (!Nombre || precio_unitario === undefined || cantidad === undefined || !Marca) {
             console.warn("\tValidación fallida: Faltan datos requeridos (*).");
             return res.status(400).json({ success: false, message: 'Faltan datos requeridos (Nombre, Precio, Cantidad, Marca).' });
         }
+
         const precioNum = parseFloat(precio_unitario);
         const cantidadNum = parseInt(cantidad, 10);
         const categoriaId = ID_Categoria ? parseInt(ID_Categoria, 10) : null;
+
         if (isNaN(precioNum) || precioNum < 0) { console.warn("\tValidación fallida: Precio inválido."); return res.status(400).json({ success: false, message: 'Precio inválido.' }); }
         if (isNaN(cantidadNum) || cantidadNum < 0) { console.warn("\tValidación fallida: Cantidad inválida."); return res.status(400).json({ success: false, message: 'Cantidad inválida.' }); }
         if (ID_Categoria && isNaN(categoriaId)) { console.warn("\tValidación fallida: ID Categoría inválido."); return res.status(400).json({ success: false, message: 'ID Categoría inválido.' }); }
-        const sql = `INSERT INTO producto (Nombre, Descripcion, precio_unitario, Marca, Codigo_Barras, ID_Categoria, cantidad, imagen_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
-        const values = [ Nombre, Descripcion || null, precioNum, Marca, Codigo_Barras || null, categoriaId, cantidadNum, imagen_url || null ];
+
+        // *** CAMBIO: Añadir las nuevas columnas al INSERT SQL ***
+        const sql = `INSERT INTO producto
+                     (Nombre, Descripcion, precio_unitario, Marca, Codigo_Barras, ID_Categoria, cantidad, imagen_url, imagen_url_2, imagen_url_3, imagen_url_4, imagen_url_5)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        const values = [
+            Nombre, Descripcion || null, precioNum, Marca, Codigo_Barras || null,
+            categoriaId, cantidadNum, imagen_url || null,
+            imagen_url_2 || null, // Añadir nuevas URLs (o null si están vacías)
+            imagen_url_3 || null,
+            imagen_url_4 || null,
+            imagen_url_5 || null
+        ];
+
         console.log("\tEjecutando SQL INSERT...");
         const [result] = await dbPool.query(sql, values);
+
         console.log(`\t<-- Producto añadido con ID: ${result.insertId}`);
         res.status(201).json({ success: true, message: 'Producto añadido exitosamente.', productId: result.insertId });
+
     } catch (error) {
         console.error('!!! Error POST /api/admin/products:', error);
         if (error.code === 'ER_DUP_ENTRY') { console.warn("\tError: Intento de insertar código de barras duplicado."); return res.status(409).json({ success: false, message: 'Error: El código de barras ya existe.' }); }
         res.status(500).json({ success: false, message: 'Error interno del servidor al añadir el producto.' });
     }
 });
-app.put('/api/admin/products/:id', checkAdmin, async (req, res) => { /* ... (sin cambios) ... */
+
+app.put('/api/admin/products/:id', checkAdmin, async (req, res) => {
     const { id } = req.params;
     console.log(`--> PUT /api/admin/products/${id}`);
     if (isNaN(id)) { console.warn("\tSolicitud rechazada: ID inválido."); return res.status(400).json({ success: false, message: 'ID inválido.' }); }
+
     try {
-        const { Nombre, Descripcion, precio_unitario, Marca, Codigo_Barras, ID_Categoria, cantidad, imagen_url } = req.body;
+        // *** CAMBIO: Recibir las nuevas URLs de imagen del body ***
+        const { Nombre, Descripcion, precio_unitario, Marca, Codigo_Barras, ID_Categoria, cantidad, imagen_url, imagen_url_2, imagen_url_3, imagen_url_4, imagen_url_5 } = req.body;
         console.log(`\tDatos recibidos para actualizar ID ${id}:`, req.body);
+
         if (!Nombre || precio_unitario === undefined || cantidad === undefined || !Marca) { console.warn("\tValidación fallida: Faltan datos requeridos (*)."); return res.status(400).json({ success: false, message: 'Faltan datos requeridos (Nombre, Precio, Cantidad, Marca).' }); }
+
         const precioNum = parseFloat(precio_unitario);
         const cantidadNum = parseInt(cantidad, 10);
         const categoriaId = ID_Categoria ? parseInt(ID_Categoria, 10) : null;
+
         if (isNaN(precioNum) || precioNum < 0) { console.warn("\tValidación fallida: Precio inválido."); return res.status(400).json({ success: false, message: 'Precio inválido.' }); }
         if (isNaN(cantidadNum) || cantidadNum < 0) { console.warn("\tValidación fallida: Cantidad inválida."); return res.status(400).json({ success: false, message: 'Cantidad inválida.' }); }
         if (ID_Categoria && isNaN(categoriaId)) { console.warn("\tValidación fallida: ID Categoría inválido."); return res.status(400).json({ success: false, message: 'ID Categoría inválido.' }); }
-        const sql = `UPDATE producto SET Nombre = ?, Descripcion = ?, precio_unitario = ?, Marca = ?, Codigo_Barras = ?, ID_Categoria = ?, cantidad = ?, imagen_url = ? WHERE ID_Producto = ?`;
-        const values = [ Nombre, Descripcion || null, precioNum, Marca, Codigo_Barras || null, categoriaId, cantidadNum, imagen_url || null, id ];
+
+        // *** CAMBIO: Añadir las nuevas columnas al UPDATE SQL ***
+        const sql = `UPDATE producto SET
+                        Nombre = ?, Descripcion = ?, precio_unitario = ?, Marca = ?,
+                        Codigo_Barras = ?, ID_Categoria = ?, cantidad = ?, imagen_url = ?,
+                        imagen_url_2 = ?, imagen_url_3 = ?, imagen_url_4 = ?, imagen_url_5 = ?
+                     WHERE ID_Producto = ?`;
+        const values = [
+            Nombre, Descripcion || null, precioNum, Marca, Codigo_Barras || null,
+            categoriaId, cantidadNum, imagen_url || null,
+            imagen_url_2 || null, // Añadir nuevas URLs (o null si están vacías)
+            imagen_url_3 || null,
+            imagen_url_4 || null,
+            imagen_url_5 || null,
+            id // El ID va al final para el WHERE
+        ];
+
         console.log("\tEjecutando SQL UPDATE...");
         const [result] = await dbPool.query(sql, values);
+
         if (result.affectedRows === 0) { console.log(`\t<-- Producto ID ${id} no encontrado para actualizar`); return res.status(404).json({ success: false, message: 'Producto no encontrado para actualizar.' }); }
+
         console.log(`\t<-- Producto actualizado ID: ${id}`);
         res.status(200).json({ success: true, message: 'Producto actualizado exitosamente.' });
+
     } catch (error) {
         console.error(`!!! Error PUT /api/admin/products/${id}:`, error);
         if (error.code === 'ER_DUP_ENTRY') { console.warn("\tError: Intento de actualizar a un código de barras duplicado."); return res.status(409).json({ success: false, message: 'Error: El código de barras ya existe para otro producto.' }); }
         res.status(500).json({ success: false, message: 'Error interno del servidor al actualizar el producto.' });
     }
 });
-app.delete('/api/admin/products/:id', checkAdmin, async (req, res) => { /* ... (sin cambios) ... */
+
+app.delete('/api/admin/products/:id', checkAdmin, async (req, res) => {
     const { id } = req.params;
     console.log(`--> DELETE /api/admin/products/${id}`);
      if (isNaN(id)) { console.warn("\tSolicitud rechazada: ID inválido."); return res.status(400).json({ success: false, message: 'ID inválido.' }); }
@@ -442,12 +489,14 @@ app.delete('/api/admin/products/:id', checkAdmin, async (req, res) => { /* ... (
         res.status(500).json({ success: false, message: 'Error interno del servidor al eliminar el producto.' });
     }
 });
-app.get('/api/admin/settings', checkAdmin, (req, res) => { /* ... (sin cambios) ... */
+
+app.get('/api/admin/settings', checkAdmin, (req, res) => {
     console.log("--> GET /api/admin/settings");
     console.log("\t<-- Devolviendo configuración del sitio (simulada)");
     res.status(200).json({ success: true, settings: siteSettings });
 });
-app.put('/api/admin/settings', checkAdmin, (req, res) => { /* ... (sin cambios) ... */
+
+app.put('/api/admin/settings', checkAdmin, (req, res) => {
     console.log("--> PUT /api/admin/settings");
     const newSettings = req.body;
     const allowedKeys = ['colorPrimary', 'colorSecondary', 'colorAccent', 'welcomeTitle', 'promoBannerTitle', 'promoBannerText'];
@@ -481,7 +530,7 @@ app.listen(PORT, () => {
 });
 
 // --- MANEJO DE CIERRE GRACEFUL ---
-const gracefulShutdown = async (signal) => { /* ... (sin cambios) ... */
+const gracefulShutdown = async (signal) => {
     console.log(`\n==> Recibida señal ${signal}. Cerrando servidor graceful...`);
     try {
         if (dbPool) {
@@ -498,4 +547,3 @@ const gracefulShutdown = async (signal) => { /* ... (sin cambios) ... */
 };
 process.on('SIGINT', gracefulShutdown);
 process.on('SIGTERM', gracefulShutdown);
-
