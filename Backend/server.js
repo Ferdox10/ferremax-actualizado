@@ -684,6 +684,7 @@ app.listen(PORT, () => {
     console.log("\n========================================");
     console.log(`==> Servidor Ferremax (Wompi) escuchando en puerto ${PORT}`);
     console.log(`==> Modo: ${isProduction ? 'Producción' : 'Desarrollo/Sandbox'}`);
+
     console.log("========================================");
 });
 
