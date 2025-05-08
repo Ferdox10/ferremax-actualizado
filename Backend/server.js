@@ -1,15 +1,14 @@
-// server.js - Servidor Backend Unificado para Ferremax
-// Basado en SERVER FERREMAX.pdf original
-// Añadido soporte para 5 imágenes de producto
-// Añadido soporte para settings de Contacto y Redes Sociales (en memoria)
+// server.js - Servidor Backend Unificado para Ferremax con Wompi, Admin CRUD y Personalización
+// Versión que lee la configuración de la DB desde variables de entorno estándar (.env localmente)
+// Añadido SSL para conexión a TiDB Cloud
+// *** Añadido soporte para 5 imágenes de producto ***
 
 // --- DEPENDENCIAS ---
 const express = require('express');
 const cors = require('cors');
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
-const crypto = require('crypto'); // Necesario si se usa Wompi
-// const paypal = require('@paypal/checkout-server-sdk'); // Comentado si no se usa PayPal
+const crypto = require('crypto');
 require('dotenv').config();
 
 // --- CONFIGURACIÓN GENERAL ---
@@ -18,59 +17,30 @@ const PORT = process.env.PORT || 4000;
 const saltRounds = 10;
 const isProduction = process.env.NODE_ENV === 'production';
 
-// --- CONFIGURACIÓN PASARELA DE PAGO (Wompi o PayPal) ---
-// Descomenta la sección que corresponda y comenta la otra
-
-// --- Configuración Wompi ---
+// --- CONFIGURACIÓN WOMPI y FRONTEND URL ---
 const WOMPI_PUBLIC_KEY = process.env.WOMPI_PUBLIC_KEY;
 const WOMPI_PRIVATE_KEY = process.env.WOMPI_PRIVATE_KEY;
 const WOMPI_EVENTS_SECRET = process.env.WOMPI_EVENTS_SECRET;
-const FRONTEND_URL = process.env.FRONTEND_URL; // Necesario para Wompi y config
+const FRONTEND_URL = process.env.FRONTEND_URL;
 
 if (!WOMPI_PUBLIC_KEY || !WOMPI_PRIVATE_KEY || !WOMPI_EVENTS_SECRET || !FRONTEND_URL) {
-    console.warn("\n!!! ADVERTENCIA: Faltan variables de entorno críticas (WOMPI_*, FRONTEND_URL). La pasarela de pago o la configuración pueden fallar.\n");
-    // Considerar salir si Wompi es esencial: // if (isProduction) process.exit(1);
-} else {
-    console.log(`--> Llave Pública Wompi (Backend): ...${WOMPI_PUBLIC_KEY.slice(-6)}`);
-    console.log(`--> URL Frontend para Redirección: ${FRONTEND_URL}`);
-}
-console.log(`--> Entorno Node.js: ${process.env.NODE_ENV || 'development (default)'}`);
-
-
-/*
-// --- Configuración PayPal (Si usas esta en lugar de Wompi) ---
-const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
-const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET;
-const FRONTEND_URL = process.env.FRONTEND_URL; // Aún necesario para la config
-
-if (!PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET || !FRONTEND_URL) {
-    console.error("\n!!! ERROR FATAL: Faltan variables de entorno críticas (PAYPAL_*, FRONTEND_URL).\n");
+    console.error("\n!!! ERROR FATAL: Faltan variables de entorno críticas (WOMPI_*, FRONTEND_URL) en la configuración del servicio.\n");
     if (isProduction) process.exit(1);
 }
-
-let environment;
-if (isProduction) {
-    console.log("--> Configurando PayPal en modo: Live (Producción)");
-    environment = new paypal.core.LiveEnvironment(PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET);
-} else {
-    console.log("--> Configurando PayPal en modo: Sandbox (Desarrollo)");
-    environment = new paypal.core.SandboxEnvironment(PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET);
-}
-const client = new paypal.core.PayPalHttpClient(environment);
-console.log(`--> URL Frontend (PayPal): ${FRONTEND_URL}`);
+console.log(`--> Llave Pública Wompi (Backend): ...${WOMPI_PUBLIC_KEY ? WOMPI_PUBLIC_KEY.slice(-6) : 'NO DEFINIDA'}`);
+console.log(`--> URL Frontend para Redirección: ${FRONTEND_URL || 'NO DEFINIDA'}`);
 console.log(`--> Entorno Node.js: ${process.env.NODE_ENV || 'development (default)'}`);
-*/
 
-
-// --- ALMACENAMIENTO SIMULADO DE CONFIGURACIÓN DEL SITIO (EN MEMORIA) ---
-// *** CAMBIO: Añadir campos para contacto y redes sociales ***
+// --- ALMACENAMIENTO SIMULADO DE CONFIGURACIÓN DEL SITIO ---
+// *** CAMBIO: Añadir campos para contacto y redes sociales a la configuración inicial/default ***
 let siteSettings = {
     colorPrimary: '#ea580c',
     colorSecondary: '#047857',
-    colorAccent: '#f3f4f6',
+    colorAccent: '#f1f5f9',
     welcomeTitle: 'Bienvenido a Ferremax',
     promoBannerTitle: '¡Ofertas Imperdibles de Temporada!',
     promoBannerText: 'Encuentra descuentos especiales en herramientas seleccionadas. ¡No te lo pierdas!',
+    // Nuevos campos (inicialmente vacíos o con valores por defecto)
     contactAddress: 'Calle Falsa 123, Ciudad Ejemplo',
     contactPhone: '+57 300 123 4567',
     contactEmail: 'info@ferremax.example.com',
@@ -79,41 +49,34 @@ let siteSettings = {
     socialInstagram: '',
     socialYoutube: ''
 };
-console.log("--> Configuración inicial del sitio (en memoria):", siteSettings);
+console.log("--> Configuración inicial del sitio (simulada):", siteSettings);
 
-// --- ALMACENAMIENTO TEMPORAL PARA ÓRDENES (Wompi o PayPal) ---
-const wompiTempOrders = {}; // Si usas Wompi
+// --- ALMACENAMIENTO TEMPORAL PARA ÓRDENES WOMPI ---
+const wompiTempOrders = {};
 const WOMPI_TEMP_ORDER_TIMEOUT = 1000 * 60 * 30;
-// let tempOrderData = {}; // Si usas PayPal
 
 // --- MIDDLEWARE ---
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// --- CONEXIÓN BASE DE DATOS (Usando Pool y variables .env estándar + SSL opcional) ---
+// --- CONEXIÓN BASE DE DATOS (Con SSL para TiDB Cloud) ---
 let dbPool;
 try {
     console.log("Intentando conectar a la DB usando variables de entorno estándar (DB_HOST, DB_USER, etc.)...");
-    const dbOptions = {
+    dbPool = mysql.createPool({
         host: process.env.DB_HOST,
         user: process.env.DB_USER,
         password: process.env.DB_PASSWORD,
         database: process.env.DB_NAME,
-        port: process.env.DB_PORT || 3306,
+        port: process.env.DB_PORT || 3306, // TiDB Cloud usa 4000, pero Render puede inyectar DB_PORT
         waitForConnections: true,
         connectionLimit: 10,
-        queueLimit: 0
-    };
-
-    // Añadir SSL solo si se requiere (ej. para TiDB Cloud)
-    // Puedes controlarlo con otra variable de entorno si quieres, ej. DB_SSL_REQUIRED=true
-    if (process.env.DB_SSL_REQUIRED === 'true') {
-        console.log("--> Habilitando SSL para la conexión DB.");
-        dbOptions.ssl = { rejectUnauthorized: true }; // Opciones más específicas si son necesarias
-    }
-
-    dbPool = mysql.createPool(dbOptions);
+        queueLimit: 0,
+        ssl: {
+             rejectUnauthorized: true // Requerido por TiDB Cloud Serverless
+        }
+    });
 
     dbPool.getConnection()
         .then(connection => {
@@ -132,7 +95,7 @@ try {
     if (isProduction) process.exit(1);
 }
 
-// --- MIDDLEWARE DE AUTENTICACIÓN ADMIN (Simulado) ---
+// --- MIDDLEWARE DE AUTENTICACIÓN ADMIN ---
 const checkAdmin = (req, res, next) => {
     const isAdminSimulated = req.headers['x-admin-simulated'] === 'true';
     if (isAdminSimulated) {
@@ -150,7 +113,7 @@ app.get('/api/config', (req, res) => {
     try {
         res.status(200).json({
             success: true,
-            wompiPublicKey: WOMPI_PUBLIC_KEY, // Asegúrate de que esta variable esté definida si usas Wompi
+            wompiPublicKey: WOMPI_PUBLIC_KEY,
             frontendBaseUrl: FRONTEND_URL
         });
         console.log("\t<-- Enviando configuración pública al frontend.");
@@ -288,10 +251,8 @@ app.post('/api/contact', async (req, res) => {
     }
 });
 
-// --- RUTAS PASARELA DE PAGO (Descomenta la que uses: Wompi o PayPal) ---
-
 // --- RUTAS WOMPI ---
-app.post('/api/wompi/temp-order', async (req, res) => {
+app.post('/api/wompi/temp-order', async (req, res) => { /* ... (sin cambios) ... */
     const { reference, items, total } = req.body;
     console.log(`--> POST /api/wompi/temp-order (Ref: ${reference})`);
     if (!reference || !Array.isArray(items) || items.length === 0 || total === undefined) {
@@ -308,7 +269,7 @@ app.post('/api/wompi/temp-order', async (req, res) => {
     setTimeout(() => { if (wompiTempOrders[reference]) { console.log(`\t[Cleanup] Eliminando orden temporal expirada: ${reference}`); delete wompiTempOrders[reference]; } }, WOMPI_TEMP_ORDER_TIMEOUT);
     res.status(200).json({ success: true, message: 'Orden temporal guardada.' });
 });
-app.post('/api/wompi/webhook', async (req, res) => {
+app.post('/api/wompi/webhook', async (req, res) => { /* ... (sin cambios) ... */
     console.log("--> POST /api/wompi/webhook (Notificación Wompi recibida)");
     const signatureReceived = req.body.signature?.checksum;
     const eventData = req.body.data?.transaction;
@@ -387,127 +348,11 @@ app.post('/api/wompi/webhook', async (req, res) => {
     }
 });
 
-/*
-// --- RUTAS PAYPAL (Si usas esta en lugar de Wompi) ---
-app.post('/api/orders', async (req, res) => {
-    console.log("--> POST /api/orders (Crear orden PayPal)");
-    const { cart } = req.body;
-    if (!cart || !Array.isArray(cart) || cart.length === 0) {
-        return res.status(400).json({ success: false, message: "Carrito inválido o vacío." });
-    }
-
-    // Calcular total y preparar items para PayPal
-    let totalAmount = 0;
-    const items = cart.map(item => {
-        const itemTotal = (parseFloat(item.price) * parseInt(item.quantity)).toFixed(2);
-        totalAmount += parseFloat(itemTotal);
-        return {
-            name: item.name.substring(0, 127), // Limitar nombre
-            unit_amount: {
-                currency_code: 'USD', // Asumiendo USD
-                value: parseFloat(item.price).toFixed(2)
-            },
-            quantity: item.quantity.toString()
-        };
-    });
-    totalAmount = totalAmount.toFixed(2);
-
-    const request = new paypal.orders.OrdersCreateRequest();
-    request.prefer("return=representation");
-    request.requestBody({
-        intent: 'CAPTURE',
-        purchase_units: [{
-            amount: {
-                currency_code: 'USD',
-                value: totalAmount,
-                breakdown: {
-                    item_total: {
-                        currency_code: 'USD',
-                        value: totalAmount
-                    }
-                }
-            },
-            items: items
-        }]
-    });
-
-    try {
-        const order = await client.execute(request);
-        console.log(`\t<-- Orden PayPal creada ID: ${order.result.id}`);
-        // Guardar temporalmente los datos del carrito asociados al ID de orden de PayPal
-        tempOrderData[order.result.id] = cart;
-        res.status(201).json({ success: true, orderID: order.result.id });
-    } catch (err) {
-        console.error("!!! Error creando orden PayPal:", err.statusCode, err.message);
-        res.status(err.statusCode || 500).json({ success: false, message: err.message || 'Error al crear la orden de PayPal.' });
-    }
-});
-
-app.post('/api/orders/:orderID/capture', async (req, res) => {
-    const { orderID } = req.params;
-    console.log(`--> POST /api/orders/${orderID}/capture (Capturar orden PayPal)`);
-    const request = new paypal.orders.OrdersCaptureRequest(orderID);
-    request.requestBody({});
-
-    try {
-        const capture = await client.execute(request);
-        console.log(`\t<-- Orden PayPal capturada ID: ${capture.result.id}, Estado: ${capture.result.status}`);
-
-        // Verificar si la captura fue completada
-        if (capture.result.status === 'COMPLETED') {
-            // Recuperar los items del carrito guardados temporalmente
-            const cartItems = tempOrderData[orderID];
-            if (cartItems && Array.isArray(cartItems)) {
-                console.log("\tActualizando stock para orden completada...");
-                let connection;
-                try {
-                    connection = await dbPool.getConnection();
-                    await connection.beginTransaction();
-                    const updatePromises = cartItems.map(item => {
-                        console.log(`\t\t- Descontando ${item.quantity} de stock para Producto ID: ${item.productId}`);
-                        return connection.query(
-                            'UPDATE producto SET cantidad = GREATEST(0, cantidad - ?) WHERE ID_Producto = ? AND cantidad >= ?',
-                            [item.quantity, item.productId, item.quantity]
-                        );
-                    });
-                    await Promise.all(updatePromises); // Esperar a que todas las actualizaciones terminen
-                    await connection.commit();
-                    console.log("\t\tCommit DB exitoso. Stock actualizado.");
-                } catch (dbError) {
-                    console.error("!!! Error CRÍTICO DB al actualizar stock post-PayPal:", dbError);
-                    if (connection) await connection.rollback();
-                    // Considerar cómo manejar este error (notificar admin, etc.)
-                } finally {
-                    if (connection) connection.release();
-                    // Limpiar datos temporales después de intentar actualizar stock
-                    delete tempOrderData[orderID];
-                     console.log(`\t\tDatos temporales eliminados para Orden ID: ${orderID}.`);
-                }
-            } else {
-                console.warn(`\tAdvertencia: No se encontraron datos temporales del carrito para la orden PayPal ${orderID}. No se pudo actualizar stock.`);
-            }
-            res.status(200).json({ success: true, capture: capture.result });
-        } else {
-            // Si el estado no es COMPLETED, devolver el resultado pero indicar que no se completó
-            console.warn(`\tCaptura PayPal no completada. Estado: ${capture.result.status}`);
-            // Limpiar datos temporales si la captura no fue exitosa
-            delete tempOrderData[orderID];
-            res.status(200).json({ success: false, message: `Captura no completada (${capture.result.status})`, capture: capture.result });
-        }
-
-    } catch (err) {
-        console.error("!!! Error capturando orden PayPal:", err.statusCode, err.message);
-        // Limpiar datos temporales en caso de error
-        delete tempOrderData[orderID];
-        res.status(err.statusCode || 500).json({ success: false, message: err.message || 'Error al capturar la orden de PayPal.' });
-    }
-});
-*/
-
 // --- RUTAS DE ADMINISTRACIÓN ---
 app.get('/api/admin/products', checkAdmin, async (req, res) => {
     console.log("--> GET /api/admin/products");
     try {
+        // *** CAMBIO: Seleccionar también las nuevas columnas de imagen ***
         const [results] = await dbPool.query('SELECT ID_Producto, Nombre, Descripcion, precio_unitario, Marca, Codigo_Barras, ID_Categoria, cantidad, imagen_url, imagen_url_2, imagen_url_3, imagen_url_4, imagen_url_5 FROM producto ORDER BY ID_Producto ASC');
         console.log(`\t<-- Devolviendo ${results.length} productos para admin`);
         res.status(200).json(results);
@@ -525,6 +370,8 @@ app.get('/api/admin/products/:id', checkAdmin, async (req, res) => {
         return res.status(400).json({ success: false, message: 'ID inválido.' });
     }
     try {
+        // *** CAMBIO: Seleccionar también las nuevas columnas de imagen ***
+        // Usar SELECT * es más simple aquí ya que necesitamos todas las columnas para editar
         const [results] = await dbPool.query('SELECT * FROM producto WHERE ID_Producto = ?', [id]);
         if (results.length === 0) {
              console.log(`\t<-- Producto admin ID ${id} no encontrado para editar`);
@@ -541,24 +388,42 @@ app.get('/api/admin/products/:id', checkAdmin, async (req, res) => {
 app.post('/api/admin/products', checkAdmin, async (req, res) => {
     console.log("--> POST /api/admin/products");
     try {
+        // *** CAMBIO: Recibir las nuevas URLs de imagen del body ***
         const { Nombre, Descripcion, precio_unitario, Marca, Codigo_Barras, ID_Categoria, cantidad, imagen_url, imagen_url_2, imagen_url_3, imagen_url_4, imagen_url_5 } = req.body;
         console.log("\tDatos recibidos para añadir:", req.body);
+
         if (!Nombre || precio_unitario === undefined || cantidad === undefined || !Marca) {
             console.warn("\tValidación fallida: Faltan datos requeridos (*).");
             return res.status(400).json({ success: false, message: 'Faltan datos requeridos (Nombre, Precio, Cantidad, Marca).' });
         }
+
         const precioNum = parseFloat(precio_unitario);
         const cantidadNum = parseInt(cantidad, 10);
         const categoriaId = ID_Categoria ? parseInt(ID_Categoria, 10) : null;
+
         if (isNaN(precioNum) || precioNum < 0) { console.warn("\tValidación fallida: Precio inválido."); return res.status(400).json({ success: false, message: 'Precio inválido.' }); }
         if (isNaN(cantidadNum) || cantidadNum < 0) { console.warn("\tValidación fallida: Cantidad inválida."); return res.status(400).json({ success: false, message: 'Cantidad inválida.' }); }
         if (ID_Categoria && isNaN(categoriaId)) { console.warn("\tValidación fallida: ID Categoría inválido."); return res.status(400).json({ success: false, message: 'ID Categoría inválido.' }); }
-        const sql = `INSERT INTO producto (Nombre, Descripcion, precio_unitario, Marca, Codigo_Barras, ID_Categoria, cantidad, imagen_url, imagen_url_2, imagen_url_3, imagen_url_4, imagen_url_5) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-        const values = [ Nombre, Descripcion || null, precioNum, Marca, Codigo_Barras || null, categoriaId, cantidadNum, imagen_url || null, imagen_url_2 || null, imagen_url_3 || null, imagen_url_4 || null, imagen_url_5 || null ];
+
+        // *** CAMBIO: Añadir las nuevas columnas al INSERT SQL ***
+        const sql = `INSERT INTO producto
+                     (Nombre, Descripcion, precio_unitario, Marca, Codigo_Barras, ID_Categoria, cantidad, imagen_url, imagen_url_2, imagen_url_3, imagen_url_4, imagen_url_5)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        const values = [
+            Nombre, Descripcion || null, precioNum, Marca, Codigo_Barras || null,
+            categoriaId, cantidadNum, imagen_url || null,
+            imagen_url_2 || null, // Añadir nuevas URLs (o null si están vacías)
+            imagen_url_3 || null,
+            imagen_url_4 || null,
+            imagen_url_5 || null
+        ];
+
         console.log("\tEjecutando SQL INSERT...");
         const [result] = await dbPool.query(sql, values);
+
         console.log(`\t<-- Producto añadido con ID: ${result.insertId}`);
         res.status(201).json({ success: true, message: 'Producto añadido exitosamente.', productId: result.insertId });
+
     } catch (error) {
         console.error('!!! Error POST /api/admin/products:', error);
         if (error.code === 'ER_DUP_ENTRY') { console.warn("\tError: Intento de insertar código de barras duplicado."); return res.status(409).json({ success: false, message: 'Error: El código de barras ya existe.' }); }
@@ -570,23 +435,46 @@ app.put('/api/admin/products/:id', checkAdmin, async (req, res) => {
     const { id } = req.params;
     console.log(`--> PUT /api/admin/products/${id}`);
     if (isNaN(id)) { console.warn("\tSolicitud rechazada: ID inválido."); return res.status(400).json({ success: false, message: 'ID inválido.' }); }
+
     try {
+        // *** CAMBIO: Recibir las nuevas URLs de imagen del body ***
         const { Nombre, Descripcion, precio_unitario, Marca, Codigo_Barras, ID_Categoria, cantidad, imagen_url, imagen_url_2, imagen_url_3, imagen_url_4, imagen_url_5 } = req.body;
         console.log(`\tDatos recibidos para actualizar ID ${id}:`, req.body);
+
         if (!Nombre || precio_unitario === undefined || cantidad === undefined || !Marca) { console.warn("\tValidación fallida: Faltan datos requeridos (*)."); return res.status(400).json({ success: false, message: 'Faltan datos requeridos (Nombre, Precio, Cantidad, Marca).' }); }
+
         const precioNum = parseFloat(precio_unitario);
         const cantidadNum = parseInt(cantidad, 10);
         const categoriaId = ID_Categoria ? parseInt(ID_Categoria, 10) : null;
+
         if (isNaN(precioNum) || precioNum < 0) { console.warn("\tValidación fallida: Precio inválido."); return res.status(400).json({ success: false, message: 'Precio inválido.' }); }
         if (isNaN(cantidadNum) || cantidadNum < 0) { console.warn("\tValidación fallida: Cantidad inválida."); return res.status(400).json({ success: false, message: 'Cantidad inválida.' }); }
         if (ID_Categoria && isNaN(categoriaId)) { console.warn("\tValidación fallida: ID Categoría inválido."); return res.status(400).json({ success: false, message: 'ID Categoría inválido.' }); }
-        const sql = `UPDATE producto SET Nombre = ?, Descripcion = ?, precio_unitario = ?, Marca = ?, Codigo_Barras = ?, ID_Categoria = ?, cantidad = ?, imagen_url = ?, imagen_url_2 = ?, imagen_url_3 = ?, imagen_url_4 = ?, imagen_url_5 = ? WHERE ID_Producto = ?`;
-        const values = [ Nombre, Descripcion || null, precioNum, Marca, Codigo_Barras || null, categoriaId, cantidadNum, imagen_url || null, imagen_url_2 || null, imagen_url_3 || null, imagen_url_4 || null, imagen_url_5 || null, id ];
+
+        // *** CAMBIO: Añadir las nuevas columnas al UPDATE SQL ***
+        const sql = `UPDATE producto SET
+                        Nombre = ?, Descripcion = ?, precio_unitario = ?, Marca = ?,
+                        Codigo_Barras = ?, ID_Categoria = ?, cantidad = ?, imagen_url = ?,
+                        imagen_url_2 = ?, imagen_url_3 = ?, imagen_url_4 = ?, imagen_url_5 = ?
+                     WHERE ID_Producto = ?`;
+        const values = [
+            Nombre, Descripcion || null, precioNum, Marca, Codigo_Barras || null,
+            categoriaId, cantidadNum, imagen_url || null,
+            imagen_url_2 || null, // Añadir nuevas URLs (o null si están vacías)
+            imagen_url_3 || null,
+            imagen_url_4 || null,
+            imagen_url_5 || null,
+            id // El ID va al final para el WHERE
+        ];
+
         console.log("\tEjecutando SQL UPDATE...");
         const [result] = await dbPool.query(sql, values);
+
         if (result.affectedRows === 0) { console.log(`\t<-- Producto ID ${id} no encontrado para actualizar`); return res.status(404).json({ success: false, message: 'Producto no encontrado para actualizar.' }); }
+
         console.log(`\t<-- Producto actualizado ID: ${id}`);
         res.status(200).json({ success: true, message: 'Producto actualizado exitosamente.' });
+
     } catch (error) {
         console.error(`!!! Error PUT /api/admin/products/${id}:`, error);
         if (error.code === 'ER_DUP_ENTRY') { console.warn("\tError: Intento de actualizar a un código de barras duplicado."); return res.status(409).json({ success: false, message: 'Error: El código de barras ya existe para otro producto.' }); }
@@ -615,43 +503,59 @@ app.delete('/api/admin/products/:id', checkAdmin, async (req, res) => {
 // *** CAMBIO: GET /api/admin/settings ahora devuelve todos los settings ***
 app.get('/api/admin/settings', checkAdmin, (req, res) => {
     console.log("--> GET /api/admin/settings");
-    console.log("\t<-- Devolviendo configuración actual del sitio (en memoria)");
+    // En un caso real, leerías esto de una tabla 'settings' en la DB
+    console.log("\t<-- Devolviendo configuración del sitio (simulada)");
     res.status(200).json({ success: true, settings: siteSettings });
 });
 
-// *** CAMBIO: PUT /api/admin/settings ahora maneja todas las claves (en memoria) ***
+// *** CAMBIO: PUT /api/admin/settings ahora maneja todas las claves ***
 app.put('/api/admin/settings', checkAdmin, (req, res) => {
     console.log("--> PUT /api/admin/settings");
     const newSettings = req.body;
-    const allowedKeys = [ 'colorPrimary', 'colorSecondary', 'colorAccent', 'welcomeTitle', 'promoBannerTitle', 'promoBannerText', 'contactAddress', 'contactPhone', 'contactEmail', 'socialFacebook', 'socialTwitter', 'socialInstagram', 'socialYoutube' ];
+    // Definir todas las claves permitidas
+    const allowedKeys = [
+        'colorPrimary', 'colorSecondary', 'colorAccent',
+        'welcomeTitle', 'promoBannerTitle', 'promoBannerText',
+        'contactAddress', 'contactPhone', 'contactEmail',
+        'socialFacebook', 'socialTwitter', 'socialInstagram', 'socialYoutube'
+    ];
     let updated = false;
+
     console.log("\tDatos recibidos para actualizar settings:", newSettings);
+
     for (const key in newSettings) {
+        // Permitir actualizar solo las claves definidas y si el valor no es undefined
         if (allowedKeys.includes(key) && newSettings[key] !== undefined) {
+            // Validar formato de color si es una clave de color
             if (key.startsWith('color') && typeof newSettings[key] === 'string' && !/^#[0-9A-Fa-f]{3}([0-9A-Fa-f]{3})?$/.test(newSettings[key])) {
                 console.warn(`\tIgnorando setting '${key}' por formato de color inválido: ${newSettings[key]}`);
-                continue;
+                continue; // Saltar esta clave inválida
             }
+            // Validar URLs si son claves sociales (simple check por http/https)
             if (key.startsWith('social') && typeof newSettings[key] === 'string' && newSettings[key] && !newSettings[key].startsWith('http')) {
-                 console.warn(`\tIgnorando setting '${key}' por formato de URL inválido: ${newSettings[key]}`);
+                 console.warn(`\tIgnorando setting '${key}' por formato de URL inválido (debe empezar con http/https): ${newSettings[key]}`);
                  continue;
             }
-            const cleanedValue = (newSettings[key] === null || newSettings[key] === undefined) ? '' : (typeof newSettings[key] === 'string' ? newSettings[key].trim() : newSettings[key]);
-            // Actualizar solo si el valor es diferente
-            if (siteSettings[key] !== cleanedValue) {
-                 siteSettings[key] = cleanedValue;
-                 updated = true;
-                 console.log(`\tSetting '${key}' actualizado a: '${siteSettings[key]}'`);
+
+            // Actualizar valor (quitando espacios extra si es string)
+            siteSettings[key] = typeof newSettings[key] === 'string' ? newSettings[key].trim() : newSettings[key];
+            // Guardar string vacío si el valor recibido es null o vacío (para poder borrar URLs)
+            if (siteSettings[key] === null || siteSettings[key] === undefined) {
+                siteSettings[key] = '';
             }
+
+            updated = true;
+            console.log(`\tSetting '${key}' actualizado a: '${siteSettings[key]}'`);
         } else {
-            if (newSettings.hasOwnProperty(key)) {
-                 console.warn(`\tIgnorando setting no permitido o indefinido: '${key}'`);
-            }
+            console.warn(`\tIgnorando setting no permitido o indefinido: '${key}'`);
         }
     }
-    // Aquí NO guardamos en DB, solo actualizamos el objeto en memoria 'siteSettings'
+
+    // En un caso real, aquí guardarías el objeto 'siteSettings' completo en la DB
+
     if (updated) {
-        console.log("\t<-- Configuración del sitio actualizada (en memoria).");
+        console.log("\t<-- Configuración del sitio actualizada (simulada).");
+        // Devolver el objeto completo de settings actualizado
         res.status(200).json({ success: true, message: 'Configuración actualizada.', settings: siteSettings });
     } else {
         console.log("\t<-- No se realizaron cambios válidos en la configuración.");
@@ -661,14 +565,12 @@ app.put('/api/admin/settings', checkAdmin, (req, res) => {
 
 
 // --- INICIAR SERVIDOR ---
-// (Se inicia después de la conexión a DB si se usa inicialización asíncrona)
-// Si no se usa inicialización asíncrona, se llama aquí:
-// app.listen(PORT, () => {
-//     console.log("\n========================================");
-//     console.log(`==> Servidor Ferremax (Wompi) escuchando en puerto ${PORT}`);
-//     console.log(`==> Modo: ${isProduction ? 'Producción' : 'Desarrollo/Sandbox'}`);
-//     console.log("========================================");
-// });
+app.listen(PORT, () => {
+    console.log("\n========================================");
+    console.log(`==> Servidor Ferremax (Wompi) escuchando en puerto ${PORT}`);
+    console.log(`==> Modo: ${isProduction ? 'Producción' : 'Desarrollo/Sandbox'}`);
+    console.log("========================================");
+});
 
 // --- MANEJO DE CIERRE GRACEFUL ---
 const gracefulShutdown = async (signal) => {
@@ -688,14 +590,4 @@ const gracefulShutdown = async (signal) => {
 };
 process.on('SIGINT', gracefulShutdown);
 process.on('SIGTERM', gracefulShutdown);
-
-// Iniciar el servidor (si no se usó inicialización asíncrona)
-// Si la conexión a DB se hace al inicio sin async/await, el app.listen va aquí.
-// Si se usa la inicialización asíncrona como en la versión anterior, esta línea se comenta o elimina.
-app.listen(PORT, () => {
-     console.log("\n========================================");
-     console.log(`==> Servidor Ferremax (Original + Mejoras) escuchando en puerto ${PORT}`);
-     console.log(`==> Modo: ${isProduction ? 'Producción' : 'Desarrollo/Sandbox'}`);
-     console.log("========================================");
-});
 
