@@ -1,16 +1,16 @@
-// server.js - Servidor Backend Unificado para Ferremax con Wompi, Admin CRUD y Personalización
-// Versión basada en SERVER FERREMAX.pdf original
-// Añadido SSL para conexión a TiDB Cloud
+// server.js - Servidor Backend Unificado para Ferremax
+// Basado en SERVER FERREMAX.pdf original
 // Añadido soporte para 5 imágenes de producto
-// Añadido soporte para guardar/leer settings de Contacto y Redes Sociales (en memoria)
+// Añadido soporte para settings de Contacto y Redes Sociales (en memoria)
 
 // --- DEPENDENCIAS ---
 const express = require('express');
 const cors = require('cors');
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
-const crypto = require('crypto');
-require('dotenv').config(); // Carga variables de .env
+const crypto = require('crypto'); // Necesario si se usa Wompi
+// const paypal = require('@paypal/checkout-server-sdk'); // Comentado si no se usa PayPal
+require('dotenv').config();
 
 // --- CONFIGURACIÓN GENERAL ---
 const app = express();
@@ -18,32 +18,60 @@ const PORT = process.env.PORT || 4000;
 const saltRounds = 10;
 const isProduction = process.env.NODE_ENV === 'production';
 
-// --- CONFIGURACIÓN WOMPI y FRONTEND URL ---
+// --- CONFIGURACIÓN PASARELA DE PAGO (Wompi o PayPal) ---
+// Descomenta la sección que corresponda y comenta la otra
+
+// --- Configuración Wompi ---
 const WOMPI_PUBLIC_KEY = process.env.WOMPI_PUBLIC_KEY;
 const WOMPI_PRIVATE_KEY = process.env.WOMPI_PRIVATE_KEY;
 const WOMPI_EVENTS_SECRET = process.env.WOMPI_EVENTS_SECRET;
-const FRONTEND_URL = process.env.FRONTEND_URL;
+const FRONTEND_URL = process.env.FRONTEND_URL; // Necesario para Wompi y config
 
 if (!WOMPI_PUBLIC_KEY || !WOMPI_PRIVATE_KEY || !WOMPI_EVENTS_SECRET || !FRONTEND_URL) {
-    console.error("\n!!! ERROR FATAL: Faltan variables de entorno críticas (WOMPI_*, FRONTEND_URL) en la configuración del servicio.\n");
-    // Salir en producción si falta configuración esencial
-    // En desarrollo, podríamos continuar con advertencias, pero es mejor asegurar la config.
-    // process.exit(1); // Descomentar si quieres que falle al inicio si falta algo
+    console.warn("\n!!! ADVERTENCIA: Faltan variables de entorno críticas (WOMPI_*, FRONTEND_URL). La pasarela de pago o la configuración pueden fallar.\n");
+    // Considerar salir si Wompi es esencial: // if (isProduction) process.exit(1);
+} else {
+    console.log(`--> Llave Pública Wompi (Backend): ...${WOMPI_PUBLIC_KEY.slice(-6)}`);
+    console.log(`--> URL Frontend para Redirección: ${FRONTEND_URL}`);
 }
-console.log(`--> Llave Pública Wompi (Backend): ...${WOMPI_PUBLIC_KEY ? WOMPI_PUBLIC_KEY.slice(-6) : 'NO DEFINIDA'}`);
-console.log(`--> URL Frontend para Redirección: ${FRONTEND_URL || 'NO DEFINIDA'}`);
 console.log(`--> Entorno Node.js: ${process.env.NODE_ENV || 'development (default)'}`);
+
+
+/*
+// --- Configuración PayPal (Si usas esta en lugar de Wompi) ---
+const PAYPAL_CLIENT_ID = process.env.PAYPAL_CLIENT_ID;
+const PAYPAL_CLIENT_SECRET = process.env.PAYPAL_CLIENT_SECRET;
+const FRONTEND_URL = process.env.FRONTEND_URL; // Aún necesario para la config
+
+if (!PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET || !FRONTEND_URL) {
+    console.error("\n!!! ERROR FATAL: Faltan variables de entorno críticas (PAYPAL_*, FRONTEND_URL).\n");
+    if (isProduction) process.exit(1);
+}
+
+let environment;
+if (isProduction) {
+    console.log("--> Configurando PayPal en modo: Live (Producción)");
+    environment = new paypal.core.LiveEnvironment(PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET);
+} else {
+    console.log("--> Configurando PayPal en modo: Sandbox (Desarrollo)");
+    environment = new paypal.core.SandboxEnvironment(PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET);
+}
+const client = new paypal.core.PayPalHttpClient(environment);
+console.log(`--> URL Frontend (PayPal): ${FRONTEND_URL}`);
+console.log(`--> Entorno Node.js: ${process.env.NODE_ENV || 'development (default)'}`);
+*/
+
 
 // --- ALMACENAMIENTO SIMULADO DE CONFIGURACIÓN DEL SITIO (EN MEMORIA) ---
 // *** CAMBIO: Añadir campos para contacto y redes sociales ***
 let siteSettings = {
     colorPrimary: '#ea580c',
     colorSecondary: '#047857',
-    colorAccent: '#f1f5f9',
+    colorAccent: '#f3f4f6',
     welcomeTitle: 'Bienvenido a Ferremax',
     promoBannerTitle: '¡Ofertas Imperdibles de Temporada!',
     promoBannerText: 'Encuentra descuentos especiales en herramientas seleccionadas. ¡No te lo pierdas!',
-    contactAddress: 'Calle Falsa 123, Barranquilla',
+    contactAddress: 'Calle Falsa 123, Ciudad Ejemplo',
     contactPhone: '+57 300 123 4567',
     contactEmail: 'info@ferremax.example.com',
     socialFacebook: '',
@@ -53,37 +81,40 @@ let siteSettings = {
 };
 console.log("--> Configuración inicial del sitio (en memoria):", siteSettings);
 
-// --- ALMACENAMIENTO TEMPORAL PARA ÓRDENES WOMPI ---
-const wompiTempOrders = {};
-const WOMPI_TEMP_ORDER_TIMEOUT = 1000 * 60 * 30; // 30 minutos
+// --- ALMACENAMIENTO TEMPORAL PARA ÓRDENES (Wompi o PayPal) ---
+const wompiTempOrders = {}; // Si usas Wompi
+const WOMPI_TEMP_ORDER_TIMEOUT = 1000 * 60 * 30;
+// let tempOrderData = {}; // Si usas PayPal
 
 // --- MIDDLEWARE ---
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// --- CONEXIÓN BASE DE DATOS (Usando Pool y variables .env estándar + SSL) ---
+// --- CONEXIÓN BASE DE DATOS (Usando Pool y variables .env estándar + SSL opcional) ---
 let dbPool;
 try {
     console.log("Intentando conectar a la DB usando variables de entorno estándar (DB_HOST, DB_USER, etc.)...");
-    dbPool = mysql.createPool({
+    const dbOptions = {
         host: process.env.DB_HOST,
         user: process.env.DB_USER,
         password: process.env.DB_PASSWORD,
         database: process.env.DB_NAME,
-        port: process.env.DB_PORT || 3306, // Puerto default MySQL o el especificado
+        port: process.env.DB_PORT || 3306,
         waitForConnections: true,
         connectionLimit: 10,
-        queueLimit: 0,
-        ssl: {
-             // Ajustar según requerimientos de tu DB (TiDB Cloud necesita 'Amazon RDS')
-             // o simplemente true si el CA es reconocido por Node
-             rejectUnauthorized: true
-             // ca: fs.readFileSync('/path/to/ca-certificate.pem').toString(), // Si necesitas un CA específico
-        }
-    });
+        queueLimit: 0
+    };
 
-    // Probar conexión inicial de forma asíncrona
+    // Añadir SSL solo si se requiere (ej. para TiDB Cloud)
+    // Puedes controlarlo con otra variable de entorno si quieres, ej. DB_SSL_REQUIRED=true
+    if (process.env.DB_SSL_REQUIRED === 'true') {
+        console.log("--> Habilitando SSL para la conexión DB.");
+        dbOptions.ssl = { rejectUnauthorized: true }; // Opciones más específicas si son necesarias
+    }
+
+    dbPool = mysql.createPool(dbOptions);
+
     dbPool.getConnection()
         .then(connection => {
             console.log(`--> Conexión exitosa a la base de datos '${connection.config.database}' en ${connection.config.host}:${connection.config.port}`);
@@ -94,8 +125,6 @@ try {
             if (err.message.includes('SSL')) {
                 console.error("--> Detalle SSL:", err);
             }
-            // Considerar salir si la DB es esencial y no conecta al inicio en producción
-            // if (isProduction) process.exit(1);
         });
 
 } catch (error) {
@@ -121,7 +150,7 @@ app.get('/api/config', (req, res) => {
     try {
         res.status(200).json({
             success: true,
-            wompiPublicKey: WOMPI_PUBLIC_KEY,
+            wompiPublicKey: WOMPI_PUBLIC_KEY, // Asegúrate de que esta variable esté definida si usas Wompi
             frontendBaseUrl: FRONTEND_URL
         });
         console.log("\t<-- Enviando configuración pública al frontend.");
@@ -259,6 +288,8 @@ app.post('/api/contact', async (req, res) => {
     }
 });
 
+// --- RUTAS PASARELA DE PAGO (Descomenta la que uses: Wompi o PayPal) ---
+
 // --- RUTAS WOMPI ---
 app.post('/api/wompi/temp-order', async (req, res) => {
     const { reference, items, total } = req.body;
@@ -355,6 +386,123 @@ app.post('/api/wompi/webhook', async (req, res) => {
          res.status(200).json({ success: true, message: `Webhook recibido. Estado: ${transactionStatus}` });
     }
 });
+
+/*
+// --- RUTAS PAYPAL (Si usas esta en lugar de Wompi) ---
+app.post('/api/orders', async (req, res) => {
+    console.log("--> POST /api/orders (Crear orden PayPal)");
+    const { cart } = req.body;
+    if (!cart || !Array.isArray(cart) || cart.length === 0) {
+        return res.status(400).json({ success: false, message: "Carrito inválido o vacío." });
+    }
+
+    // Calcular total y preparar items para PayPal
+    let totalAmount = 0;
+    const items = cart.map(item => {
+        const itemTotal = (parseFloat(item.price) * parseInt(item.quantity)).toFixed(2);
+        totalAmount += parseFloat(itemTotal);
+        return {
+            name: item.name.substring(0, 127), // Limitar nombre
+            unit_amount: {
+                currency_code: 'USD', // Asumiendo USD
+                value: parseFloat(item.price).toFixed(2)
+            },
+            quantity: item.quantity.toString()
+        };
+    });
+    totalAmount = totalAmount.toFixed(2);
+
+    const request = new paypal.orders.OrdersCreateRequest();
+    request.prefer("return=representation");
+    request.requestBody({
+        intent: 'CAPTURE',
+        purchase_units: [{
+            amount: {
+                currency_code: 'USD',
+                value: totalAmount,
+                breakdown: {
+                    item_total: {
+                        currency_code: 'USD',
+                        value: totalAmount
+                    }
+                }
+            },
+            items: items
+        }]
+    });
+
+    try {
+        const order = await client.execute(request);
+        console.log(`\t<-- Orden PayPal creada ID: ${order.result.id}`);
+        // Guardar temporalmente los datos del carrito asociados al ID de orden de PayPal
+        tempOrderData[order.result.id] = cart;
+        res.status(201).json({ success: true, orderID: order.result.id });
+    } catch (err) {
+        console.error("!!! Error creando orden PayPal:", err.statusCode, err.message);
+        res.status(err.statusCode || 500).json({ success: false, message: err.message || 'Error al crear la orden de PayPal.' });
+    }
+});
+
+app.post('/api/orders/:orderID/capture', async (req, res) => {
+    const { orderID } = req.params;
+    console.log(`--> POST /api/orders/${orderID}/capture (Capturar orden PayPal)`);
+    const request = new paypal.orders.OrdersCaptureRequest(orderID);
+    request.requestBody({});
+
+    try {
+        const capture = await client.execute(request);
+        console.log(`\t<-- Orden PayPal capturada ID: ${capture.result.id}, Estado: ${capture.result.status}`);
+
+        // Verificar si la captura fue completada
+        if (capture.result.status === 'COMPLETED') {
+            // Recuperar los items del carrito guardados temporalmente
+            const cartItems = tempOrderData[orderID];
+            if (cartItems && Array.isArray(cartItems)) {
+                console.log("\tActualizando stock para orden completada...");
+                let connection;
+                try {
+                    connection = await dbPool.getConnection();
+                    await connection.beginTransaction();
+                    const updatePromises = cartItems.map(item => {
+                        console.log(`\t\t- Descontando ${item.quantity} de stock para Producto ID: ${item.productId}`);
+                        return connection.query(
+                            'UPDATE producto SET cantidad = GREATEST(0, cantidad - ?) WHERE ID_Producto = ? AND cantidad >= ?',
+                            [item.quantity, item.productId, item.quantity]
+                        );
+                    });
+                    await Promise.all(updatePromises); // Esperar a que todas las actualizaciones terminen
+                    await connection.commit();
+                    console.log("\t\tCommit DB exitoso. Stock actualizado.");
+                } catch (dbError) {
+                    console.error("!!! Error CRÍTICO DB al actualizar stock post-PayPal:", dbError);
+                    if (connection) await connection.rollback();
+                    // Considerar cómo manejar este error (notificar admin, etc.)
+                } finally {
+                    if (connection) connection.release();
+                    // Limpiar datos temporales después de intentar actualizar stock
+                    delete tempOrderData[orderID];
+                     console.log(`\t\tDatos temporales eliminados para Orden ID: ${orderID}.`);
+                }
+            } else {
+                console.warn(`\tAdvertencia: No se encontraron datos temporales del carrito para la orden PayPal ${orderID}. No se pudo actualizar stock.`);
+            }
+            res.status(200).json({ success: true, capture: capture.result });
+        } else {
+            // Si el estado no es COMPLETED, devolver el resultado pero indicar que no se completó
+            console.warn(`\tCaptura PayPal no completada. Estado: ${capture.result.status}`);
+            // Limpiar datos temporales si la captura no fue exitosa
+            delete tempOrderData[orderID];
+            res.status(200).json({ success: false, message: `Captura no completada (${capture.result.status})`, capture: capture.result });
+        }
+
+    } catch (err) {
+        console.error("!!! Error capturando orden PayPal:", err.statusCode, err.message);
+        // Limpiar datos temporales en caso de error
+        delete tempOrderData[orderID];
+        res.status(err.statusCode || 500).json({ success: false, message: err.message || 'Error al capturar la orden de PayPal.' });
+    }
+});
+*/
 
 // --- RUTAS DE ADMINISTRACIÓN ---
 app.get('/api/admin/products', checkAdmin, async (req, res) => {
@@ -464,27 +612,20 @@ app.delete('/api/admin/products/:id', checkAdmin, async (req, res) => {
     }
 });
 
-// *** CAMBIO: GET /api/admin/settings ahora devuelve el objeto cargado/default ***
+// *** CAMBIO: GET /api/admin/settings ahora devuelve todos los settings ***
 app.get('/api/admin/settings', checkAdmin, (req, res) => {
     console.log("--> GET /api/admin/settings");
-    if (!settingsLoaded && !isProduction) {
-         console.warn("\tAdvertencia: Devolviendo settings por defecto, carga desde DB falló o no completó.");
-    }
-    console.log("\t<-- Devolviendo configuración actual del sitio");
-    const { id, ...settingsToSend } = siteSettings; // Excluir id interno
-    res.status(200).json({ success: true, settings: settingsToSend });
+    console.log("\t<-- Devolviendo configuración actual del sitio (en memoria)");
+    res.status(200).json({ success: true, settings: siteSettings });
 });
 
-// *** CAMBIO: PUT /api/admin/settings ahora guarda en DB ***
-app.put('/api/admin/settings', checkAdmin, async (req, res) => {
+// *** CAMBIO: PUT /api/admin/settings ahora maneja todas las claves (en memoria) ***
+app.put('/api/admin/settings', checkAdmin, (req, res) => {
     console.log("--> PUT /api/admin/settings");
     const newSettings = req.body;
     const allowedKeys = [ 'colorPrimary', 'colorSecondary', 'colorAccent', 'welcomeTitle', 'promoBannerTitle', 'promoBannerText', 'contactAddress', 'contactPhone', 'contactEmail', 'socialFacebook', 'socialTwitter', 'socialInstagram', 'socialYoutube' ];
-    let updatedFields = {};
-    let hasValidUpdate = false;
-
+    let updated = false;
     console.log("\tDatos recibidos para actualizar settings:", newSettings);
-
     for (const key in newSettings) {
         if (allowedKeys.includes(key) && newSettings[key] !== undefined) {
             if (key.startsWith('color') && typeof newSettings[key] === 'string' && !/^#[0-9A-Fa-f]{3}([0-9A-Fa-f]{3})?$/.test(newSettings[key])) {
@@ -496,11 +637,11 @@ app.put('/api/admin/settings', checkAdmin, async (req, res) => {
                  continue;
             }
             const cleanedValue = (newSettings[key] === null || newSettings[key] === undefined) ? '' : (typeof newSettings[key] === 'string' ? newSettings[key].trim() : newSettings[key]);
+            // Actualizar solo si el valor es diferente
             if (siteSettings[key] !== cleanedValue) {
-                siteSettings[key] = cleanedValue;
-                updatedFields[key] = cleanedValue;
-                hasValidUpdate = true;
-                console.log(`\tSetting '${key}' actualizado en memoria a: '${siteSettings[key]}'`);
+                 siteSettings[key] = cleanedValue;
+                 updated = true;
+                 console.log(`\tSetting '${key}' actualizado a: '${siteSettings[key]}'`);
             }
         } else {
             if (newSettings.hasOwnProperty(key)) {
@@ -508,39 +649,26 @@ app.put('/api/admin/settings', checkAdmin, async (req, res) => {
             }
         }
     }
-
-    if (hasValidUpdate) {
-        console.log("\tIntentando guardar configuración actualizada en la DB...");
-        try {
-            const setClauses = Object.keys(updatedFields).map(key => `${mysql.escapeId(key)} = ?`).join(', ');
-            const values = [...Object.values(updatedFields), 1]; // ID=1 para el WHERE
-
-            if (setClauses.length > 0) {
-                const sql = `UPDATE sitio_config SET ${setClauses} WHERE id = ?`;
-                const [result] = await dbPool.query(sql, values);
-                if (result.affectedRows > 0) {
-                    console.log("\t<-- Configuración guardada exitosamente en la DB.");
-                    const { id, ...settingsToSend } = siteSettings;
-                    res.status(200).json({ success: true, message: 'Configuración actualizada.', settings: settingsToSend });
-                } else {
-                    console.error("!!! Error al guardar settings: No se encontró la fila de configuración (ID=1) para actualizar.");
-                    res.status(500).json({ success: false, message: 'Error interno: No se pudo guardar la configuración.' });
-                }
-            } else {
-                 console.log("\t<-- No hubo campos válidos para actualizar en la DB.");
-                 const { id, ...settingsToSend } = siteSettings;
-                 res.status(200).json({ success: true, message: 'No se realizaron cambios válidos.', settings: settingsToSend });
-            }
-        } catch (dbError) {
-            console.error("!!! Error al guardar configuración en la DB:", dbError);
-            res.status(500).json({ success: false, message: 'Error interno al guardar la configuración.' });
-        }
+    // Aquí NO guardamos en DB, solo actualizamos el objeto en memoria 'siteSettings'
+    if (updated) {
+        console.log("\t<-- Configuración del sitio actualizada (en memoria).");
+        res.status(200).json({ success: true, message: 'Configuración actualizada.', settings: siteSettings });
     } else {
-        console.log("\t<-- No se realizaron cambios válidos en la configuración (valores iguales a los actuales).");
-        const { id, ...settingsToSend } = siteSettings;
-        res.status(200).json({ success: true, message: 'No se realizaron cambios.', settings: settingsToSend });
+        console.log("\t<-- No se realizaron cambios válidos en la configuración.");
+        res.status(200).json({ success: true, message: 'No se proporcionaron datos válidos para actualizar.', settings: siteSettings });
     }
 });
+
+
+// --- INICIAR SERVIDOR ---
+// (Se inicia después de la conexión a DB si se usa inicialización asíncrona)
+// Si no se usa inicialización asíncrona, se llama aquí:
+// app.listen(PORT, () => {
+//     console.log("\n========================================");
+//     console.log(`==> Servidor Ferremax (Wompi) escuchando en puerto ${PORT}`);
+//     console.log(`==> Modo: ${isProduction ? 'Producción' : 'Desarrollo/Sandbox'}`);
+//     console.log("========================================");
+// });
 
 // --- MANEJO DE CIERRE GRACEFUL ---
 const gracefulShutdown = async (signal) => {
@@ -561,5 +689,13 @@ const gracefulShutdown = async (signal) => {
 process.on('SIGINT', gracefulShutdown);
 process.on('SIGTERM', gracefulShutdown);
 
-// --- INICIAR LA APLICACIÓN (Llama a la inicialización asíncrona) ---
-initializeApp();
+// Iniciar el servidor (si no se usó inicialización asíncrona)
+// Si la conexión a DB se hace al inicio sin async/await, el app.listen va aquí.
+// Si se usa la inicialización asíncrona como en la versión anterior, esta línea se comenta o elimina.
+app.listen(PORT, () => {
+     console.log("\n========================================");
+     console.log(`==> Servidor Ferremax (Original + Mejoras) escuchando en puerto ${PORT}`);
+     console.log(`==> Modo: ${isProduction ? 'Producción' : 'Desarrollo/Sandbox'}`);
+     console.log("========================================");
+});
+
