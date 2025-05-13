@@ -3,7 +3,7 @@
 // Añadido SSL para conexión a TiDB Cloud
 // *** Añadido soporte para 5 imágenes de producto y nuevas funcionalidades de admin ***
 // *** Actualizado para manejar campos de dirección detallados en Pago Contra Entrega ***
-// *** Añadido endpoint para conteo de pedidos pendientes para notificaciones admin ***
+// *** Revisado para asegurar manejo de 'subject' en mensajes de contacto ***
 
 // --- DEPENDENCIAS ---
 const express = require('express');
@@ -95,7 +95,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// --- CONEXIÓN BASE DE DATOS ---
+// --- CONEXIÓN BASE DE DATOS (Con SSL para TiDB Cloud) ---
 let dbPool;
 
 async function initializeApp() {
@@ -278,15 +278,16 @@ app.post('/api/contact', async (req, res) => {
     console.log("--> POST /api/contact");
     try {
         const { name, email, subject, message } = req.body; 
-        if (!name || !email || !message) {
-            console.warn("\tMensaje de contacto: Faltan datos requeridos.");
+        if (!name || !email || !message) { // Subject es opcional en la validación pero se guardará si se envía
+            console.warn("\tMensaje de contacto: Faltan datos requeridos (nombre, email, mensaje).");
             return res.status(400).json({ success: false, message: "Nombre, email y mensaje son requeridos." });
         }
+        // Asumiendo que la tabla contact_messages TIENE una columna 'subject'
         await dbPool.query(
-            'INSERT INTO contact_messages (name, email, message, subject, created_at) VALUES (?, ?, ?, ?, NOW())',
-            [name, email, message, subject || null] 
+            'INSERT INTO contact_messages (name, email, subject, message, created_at) VALUES (?, ?, ?, ?, NOW())',
+            [name, email, subject || null, message] // Guardar subject o NULL si no se provee
         );
-        console.log(`\t<-- Mensaje de contacto de ${name} <${email}> guardado en BD.`);
+        console.log(`\t<-- Mensaje de contacto de ${name} <${email}> (Asunto: ${subject || 'N/A'}) guardado en BD.`);
         res.status(200).json({ success: true, message: '¡Mensaje recibido! Gracias por contactarnos.' });
     } catch (error) {
         console.error("!!! Error al guardar mensaje de contacto:", error);
@@ -405,19 +406,16 @@ app.post('/api/wompi/webhook', async (req, res) => {
                 const emailClienteEnvio = eventData.customer_email || tempOrderData?.customerData?.email || 'N/A';
                 const telefonoClienteEnvio = tempOrderData?.customerData?.phoneNumber || 'N/A';
                 const direccionEnvio = `${eventData.shipping_address?.address_line_1 || ''} ${eventData.shipping_address?.city || ''}`.trim() || tempOrderData?.customerData?.address || 'N/A';
-                const departamentoEnvio = eventData.shipping_address?.region || tempOrderData?.customerData?.department || null;
-                const ciudadEnvio = eventData.shipping_address?.city || tempOrderData?.customerData?.city || null;
-                const puntoReferenciaEnvio = eventData.shipping_address?.address_line_2 || tempOrderData?.customerData?.referencePoint || null;
 
 
                 const [pedidoResult] = await connection.query(
-                    `INSERT INTO pedidos (ID_Usuario, Total_Pedido, Estado_Pedido, Metodo_Pago, Referencia_Pago, 
-                                       Nombre_Cliente_Envio, Email_Cliente_Envio, Telefono_Cliente_Envio, Direccion_Envio, 
-                                       Departamento_Envio, Ciudad_Envio, Punto_Referencia_Envio, Fecha_Pedido)
+                    `INSERT INTO pedidos (ID_Usuario, Total_Pedido, Estado_Pedido, Metodo_Pago, Referencia_Pago, Nombre_Cliente_Envio, Email_Cliente_Envio, Telefono_Cliente_Envio, Direccion_Envio, Departamento_Envio, Ciudad_Envio, Punto_Referencia_Envio, Fecha_Pedido)
                      VALUES (?, ?, 'Pagado', 'Wompi', ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
                     [userId, orderDetails.total, transactionReference, 
                      nombreClienteEnvio, emailClienteEnvio, telefonoClienteEnvio, direccionEnvio, 
-                     departamentoEnvio, ciudadEnvio, puntoReferenciaEnvio
+                     eventData.shipping_address?.region || null, 
+                     eventData.shipping_address?.city || null,
+                     eventData.shipping_address?.address_line_2 || null 
                     ]
                 );
                 const pedidoId = pedidoResult.insertId;
@@ -769,24 +767,6 @@ app.put('/api/admin/orders/:id/status', checkAdmin, async (req, res) => {
     }
 });
 
-// NUEVO: Endpoint para conteo de pedidos pendientes (admin)
-app.get('/api/admin/orders/pending-count', checkAdmin, async (req, res) => {
-    console.log("--> GET /api/admin/orders/pending-count");
-    try {
-        const [rows] = await dbPool.query(
-            "SELECT COUNT(*) as pendingCount FROM pedidos WHERE Estado_Pedido IN ('Pendiente de Confirmacion', 'Pagado')"
-            // Podrías añadir: AND visto_por_admin = 0 (si implementas esa columna)
-        );
-        const pendingCount = rows[0]?.pendingCount || 0;
-        console.log(`\t<-- Pedidos pendientes: ${pendingCount}`);
-        res.status(200).json({ success: true, pendingCount });
-    } catch (error) {
-        console.error("!!! Error GET /api/admin/orders/pending-count:", error);
-        res.status(500).json({ success: false, message: "Error al obtener conteo de pedidos pendientes." });
-    }
-});
-
-
 // ANALÍTICAS
 app.get('/api/admin/analytics/sales-overview', checkAdmin, async (req, res) => {
     console.log("--> GET /api/admin/analytics/sales-overview");
@@ -831,12 +811,30 @@ app.get('/api/admin/analytics/product-views', checkAdmin, async (req, res) => {
     }
 });
 
+// NUEVO: Endpoint para conteo de pedidos pendientes (para notificaciones admin)
+app.get('/api/admin/orders/pending-count', checkAdmin, async (req, res) => {
+    console.log("--> GET /api/admin/orders/pending-count");
+    try {
+        const [rows] = await dbPool.query(
+            "SELECT COUNT(*) as pendingCount FROM pedidos WHERE Estado_Pedido IN ('Pendiente de Confirmacion', 'Pagado')"
+            // Si 'Pagado' significa que ya está listo para procesar y no ha sido 'Procesando' o 'Enviado'
+        );
+        const pendingCount = rows[0]?.pendingCount || 0;
+        console.log(`\t<-- Pedidos pendientes: ${pendingCount}`);
+        res.status(200).json({ success: true, pendingCount });
+    } catch (error) {
+        console.error("!!! Error GET /api/admin/orders/pending-count:", error);
+        res.status(500).json({ success: false, message: "Error al obtener conteo de pedidos pendientes." });
+    }
+});
+
 
 // MENSAJES DE CONTACTO
 app.get('/api/admin/contact-messages', checkAdmin, async (req, res) => {
     console.log("--> GET /api/admin/contact-messages");
     try {
         const [messages] = await dbPool.query(
+            // Asegúrate de que la columna 'subject' exista o elimínala de la consulta
             'SELECT id, name, email, subject, LEFT(message, 100) as message_preview, created_at FROM contact_messages ORDER BY created_at DESC'
         );
         res.status(200).json(messages);
