@@ -597,6 +597,18 @@ app.delete('/api/admin/products/:id', checkAdmin, async (req, res) => {
     }
 });
 
+
+app.get('/api/admin/users', checkAdmin, async (req, res) => {
+    try {
+        const [users] = await dbPool.query('SELECT id, username, email, role FROM usuarios ORDER BY id DESC');
+        res.status(200).json(users);
+    } catch (error) {
+        console.error("!!! Error GET /api/admin/users:", error); // Añadido para mejor log
+        res.status(500).json({ success: false, message: "Error al obtener usuarios." });
+    }
+});
+
+
 // SETTINGS (GET, PUT) - Ya modificado para usar BD
 app.get('/api/admin/settings', checkAdmin, (req, res) => {
     console.log("--> GET /api/admin/settings");
