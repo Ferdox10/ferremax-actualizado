@@ -2,6 +2,7 @@
 // Versión que lee la configuración de la DB desde variables de entorno estándar (.env localmente)
 // Añadido SSL para conexión a TiDB Cloud
 // *** Añadido soporte para 5 imágenes de producto y nuevas funcionalidades de admin ***
+// *** Actualizado para manejar campos de dirección detallados en Pago Contra Entrega ***
 
 // --- DEPENDENCIAS ---
 const express = require('express');
@@ -73,7 +74,14 @@ async function loadSiteSettingsFromDB() {
 
     } catch (error) {
         console.error("!!! Error CRÍTICO al cargar siteSettings desde la DB. Usando defaults en memoria:", error);
-        siteSettings = { /* ... tus valores por defecto como fallback ... */ };
+        siteSettings = { // Fallback a defaults en memoria
+            colorPrimary: '#ea580c', colorSecondary: '#047857', colorAccent: '#f1f5f9',
+            welcomeTitle: 'Bienvenido a Ferremax', promoBannerTitle: '¡Ofertas Imperdibles de Temporada!',
+            promoBannerText: 'Encuentra descuentos especiales en herramientas seleccionadas. ¡No te lo pierdas!',
+            contactAddress: 'Calle Falsa 123, Barranquilla, Colombia', contactPhone: '+57 300 123 4567',
+            contactEmail: 'info@ferremax.example.com', socialFacebook: '', socialTwitter: '',
+            socialInstagram: '', socialYoutube: ''
+        };
     }
 }
 
@@ -101,14 +109,14 @@ async function initializeApp() {
             waitForConnections: true,
             connectionLimit: 10,
             queueLimit: 0,
-            ssl: process.env.DB_SSL_CA ? { ca: process.env.DB_SSL_CA, rejectUnauthorized: true } : (isProduction ? { rejectUnauthorized: true } : null) // Adaptar según necesidad de SSL
+            ssl: process.env.DB_SSL_CA ? { ca: process.env.DB_SSL_CA, rejectUnauthorized: true } : (isProduction ? { rejectUnauthorized: true } : null)
         });
 
         const connection = await dbPool.getConnection();
         console.log(`--> Conexión exitosa a la base de datos '${connection.config.database}' en ${connection.config.host}:${connection.config.port}`);
         connection.release();
 
-        await loadSiteSettingsFromDB(); // Cargar settings después de que la conexión a BD esté lista
+        await loadSiteSettingsFromDB(); 
 
     } catch (error) {
         console.error("!!! Error CRÍTICO al inicializar la aplicación (DB o Settings):", error);
@@ -118,11 +126,8 @@ async function initializeApp() {
 
 // --- MIDDLEWARE DE AUTENTICACIÓN ADMIN ---
 const checkAdmin = (req, res, next) => {
-    // ESTO ES PARA DESARROLLO. EN PRODUCCIÓN, USA AUTENTICACIÓN REAL BASADA EN SESIÓN/TOKEN Y ROLES.
     const isAdminSimulated = req.headers['x-admin-simulated'] === 'true';
-    // const userRole = req.user?.role; // Ejemplo si tuvieras req.user de un middleware de auth
-    if (isAdminSimulated /* || userRole === 'admin' */) {
-        // console.log(`\t[Admin Check] Acceso Permitido para: ${req.method} ${req.path}`);
+    if (isAdminSimulated) {
         next();
     } else {
         console.warn(`\t[Admin Check] Acceso DENEGADO a ruta admin ${req.method} ${req.path}.`);
@@ -221,7 +226,7 @@ app.get('/api/productos', async (req, res) => {
     try {
         let sql = 'SELECT ID_Producto, Nombre, Descripcion, precio_unitario, Marca, Codigo_Barras, ID_Categoria, cantidad, imagen_url, imagen_url_2, imagen_url_3, imagen_url_4, imagen_url_5 FROM producto';
         if (limit && Number.isInteger(limit) && limit > 0) {
-            sql += ` LIMIT ${limit}`; // No es ideal para SQL injection si no se sanitiza, pero parseInt ayuda.
+            sql += ` LIMIT ${limit}`; 
         }
         const [results] = await dbPool.query(sql);
         console.log(`\t<-- Devolviendo ${results.length} productos públicos`);
@@ -271,14 +276,14 @@ app.get('/api/categories', async (req, res) => {
 app.post('/api/contact', async (req, res) => {
     console.log("--> POST /api/contact");
     try {
-        const { name, email, subject, message } = req.body;
+        const { name, email, subject, message } = req.body; // subject is received but not used in INSERT
         if (!name || !email || !message) {
             console.warn("\tMensaje de contacto: Faltan datos requeridos.");
             return res.status(400).json({ success: false, message: "Nombre, email y mensaje son requeridos." });
         }
         await dbPool.query(
-            'INSERT INTO contact_messages (name, email, message, created_at) VALUES (?, ?, ?, NOW())',
-            [name, email, message] // 'subject' no se usa en la tabla actual
+            'INSERT INTO contact_messages (name, email, message, subject, created_at) VALUES (?, ?, ?, ?, NOW())',
+            [name, email, message, subject || null] 
         );
         console.log(`\t<-- Mensaje de contacto de ${name} <${email}> guardado en BD.`);
         res.status(200).json({ success: true, message: '¡Mensaje recibido! Gracias por contactarnos.' });
@@ -309,7 +314,7 @@ app.post('/api/products/:id/view', async (req, res) => {
 
 // --- RUTAS WOMPI ---
 app.post('/api/wompi/temp-order', async (req, res) => {
-    const { reference, items, total, userId, customerData } = req.body; // customerData opcional
+    const { reference, items, total, userId, customerData } = req.body; 
     console.log(`--> POST /api/wompi/temp-order (Ref: ${reference})`);
     if (!reference || !Array.isArray(items) || items.length === 0 || total === undefined) {
         console.warn("\tSolicitud rechazada: Datos inválidos para orden temporal.");
@@ -339,7 +344,7 @@ app.post('/api/wompi/webhook', async (req, res) => {
 
     if (!signatureReceived || !eventData || !timestamp || !eventData.reference || eventData.amount_in_cents === undefined || !eventData.currency || !eventData.status) {
         console.warn("\t[Webhook Wompi] Rechazado: Payload inválido o incompleto.");
-        return res.status(200).json({ success: false, message: "Payload inválido o incompleto." }); // Wompi espera 200 OK
+        return res.status(200).json({ success: false, message: "Payload inválido o incompleto." }); 
     }
 
     const transactionReference = eventData.reference;
@@ -393,7 +398,6 @@ app.post('/api/wompi/webhook', async (req, res) => {
                 console.error(`\t\t!!! Rollback DB ejecutado (actualización de stock fallida) para Ref: ${transactionReference} debido a: ${failureMessage}`);
             } else {
                 console.log("\t\tStock actualizado correctamente.");
-                // Guardar pedido en la base de datos
                 const tempOrderData = wompiTempOrders[transactionReference];
                 const userId = tempOrderData?.userId || null;
                 const nombreClienteEnvio = tempOrderData?.customerData?.fullName || eventData.customer_email || 'Cliente Wompi';
@@ -403,9 +407,14 @@ app.post('/api/wompi/webhook', async (req, res) => {
 
 
                 const [pedidoResult] = await connection.query(
-                    `INSERT INTO pedidos (ID_Usuario, Total_Pedido, Estado_Pedido, Metodo_Pago, Referencia_Pago, Nombre_Cliente_Envio, Email_Cliente_Envio, Telefono_Cliente_Envio, Direccion_Envio, Fecha_Pedido)
-                     VALUES (?, ?, 'Pagado', 'Wompi', ?, ?, ?, ?, ?, NOW())`,
-                    [userId, orderDetails.total, transactionReference, nombreClienteEnvio, emailClienteEnvio, telefonoClienteEnvio, direccionEnvio]
+                    `INSERT INTO pedidos (ID_Usuario, Total_Pedido, Estado_Pedido, Metodo_Pago, Referencia_Pago, Nombre_Cliente_Envio, Email_Cliente_Envio, Telefono_Cliente_Envio, Direccion_Envio, Departamento_Envio, Ciudad_Envio, Punto_Referencia_Envio, Fecha_Pedido)
+                     VALUES (?, ?, 'Pagado', 'Wompi', ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+                    [userId, orderDetails.total, transactionReference, 
+                     nombreClienteEnvio, emailClienteEnvio, telefonoClienteEnvio, direccionEnvio, 
+                     eventData.shipping_address?.region || null, // Asumiendo region como departamento
+                     eventData.shipping_address?.city || null,
+                     eventData.shipping_address?.address_line_2 || null // Asumiendo address_line_2 como referencia
+                    ]
                 );
                 const pedidoId = pedidoResult.insertId;
 
@@ -442,13 +451,17 @@ app.post('/api/wompi/webhook', async (req, res) => {
 });
 
 
-// --- RUTAS DE PEDIDO CONTRA ENTREGA ---
+// --- RUTAS DE PEDIDO CONTRA ENTREGA (ACTUALIZADO) ---
 app.post('/api/orders/cash-on-delivery', async (req, res) => {
     console.log("--> POST /api/orders/cash-on-delivery");
     const { cart, customerInfo } = req.body;
 
-    if (!cart || cart.length === 0 || !customerInfo || !customerInfo.name || !customerInfo.phone || !customerInfo.address || !customerInfo.email) {
-        return res.status(400).json({ success: false, message: "Faltan datos del carrito o del cliente." });
+    // Validación actualizada para incluir departamento y ciudad
+    if (!cart || cart.length === 0 || !customerInfo ||
+        !customerInfo.name || !customerInfo.phone || !customerInfo.address ||
+        !customerInfo.department || !customerInfo.city || 
+        !customerInfo.email) {
+        return res.status(400).json({ success: false, message: "Faltan datos del carrito o del cliente (incluyendo departamento y ciudad)." });
     }
 
     let connection;
@@ -464,24 +477,33 @@ app.post('/api/orders/cash-on-delivery', async (req, res) => {
             if (productDB[0].cantidad < item.quantity) {
                 throw new Error(`Stock insuficiente para ${productDB[0].Nombre}. Disponible: ${productDB[0].cantidad}, Solicitado: ${item.quantity}. Por favor, ajusta tu carrito.`);
             }
-            item.price = productDB[0].precio_unitario; // Usar precio actual de la BD
+            item.price = productDB[0].precio_unitario; 
             totalPedido += item.price * item.quantity;
         }
 
         const [pedidoResult] = await connection.query(
-            `INSERT INTO pedidos (ID_Usuario, Total_Pedido, Estado_Pedido, Metodo_Pago, Nombre_Cliente_Envio, Direccion_Envio, Telefono_Cliente_Envio, Email_Cliente_Envio, Fecha_Pedido)
-             VALUES (?, ?, 'Pendiente de Confirmacion', 'ContraEntrega', ?, ?, ?, ?, NOW())`,
-            [customerInfo.userId || null, totalPedido, customerInfo.name, customerInfo.address, customerInfo.phone, customerInfo.email]
+            `INSERT INTO pedidos (
+                ID_Usuario, Total_Pedido, Estado_Pedido, Metodo_Pago, 
+                Nombre_Cliente_Envio, Direccion_Envio, 
+                Departamento_Envio, Ciudad_Envio, Punto_Referencia_Envio,
+                Telefono_Cliente_Envio, Email_Cliente_Envio, Fecha_Pedido
+             ) VALUES (?, ?, 'Pendiente de Confirmacion', 'ContraEntrega', ?, ?, ?, ?, ?, ?, ?, NOW())`,
+            [
+                customerInfo.userId || null, totalPedido,
+                customerInfo.name, customerInfo.address,
+                customerInfo.department, customerInfo.city, customerInfo.referencePoint || null, 
+                customerInfo.phone, customerInfo.email
+            ]
         );
         const pedidoId = pedidoResult.insertId;
-        console.log(`\tPedido contra entrega ID ${pedidoId} creado.`);
+        console.log(`\tPedido contra entrega ID ${pedidoId} creado con dirección completa.`);
 
         for (const item of cart) {
             await connection.query(
                 'INSERT INTO detalles_pedido (ID_Pedido, ID_Producto, Cantidad, Precio_Unitario_Compra) VALUES (?, ?, ?, ?)',
                 [pedidoId, item.productId, item.quantity, item.price]
             );
-            await connection.query( // Ya validamos stock con FOR UPDATE, aquí solo descontamos
+            await connection.query( 
                 'UPDATE producto SET cantidad = cantidad - ? WHERE ID_Producto = ?',
                 [item.quantity, item.productId]
             );
@@ -493,7 +515,7 @@ app.post('/api/orders/cash-on-delivery', async (req, res) => {
     } catch (error) {
         if (connection) await connection.rollback();
         console.error("!!! Error procesando pedido contra entrega:", error);
-        res.status(error.message.includes("Stock insuficiente") ? 409 : 500) // 409 Conflict for stock issues
+        res.status(error.message.includes("Stock insuficiente") ? 409 : 500) 
            .json({ success: false, message: error.message || "Error interno al procesar el pedido contra entrega." });
     } finally {
         if (connection) connection.release();
@@ -502,7 +524,7 @@ app.post('/api/orders/cash-on-delivery', async (req, res) => {
 
 
 // --- RUTAS DE ADMINISTRACIÓN ---
-// PRODUCTOS (GET all, GET one, POST, PUT, DELETE) - ya existentes y adaptados para 5 imágenes
+// PRODUCTOS
 app.get('/api/admin/products', checkAdmin, async (req, res) => {
     console.log("--> GET /api/admin/products");
     try {
@@ -564,11 +586,14 @@ app.put('/api/admin/products/:id', checkAdmin, async (req, res) => {
         if (!Nombre || precio_unitario === undefined || cantidad === undefined || !Marca) {
             return res.status(400).json({ success: false, message: 'Faltan datos requeridos (Nombre, Precio, Cantidad, Marca).' });
         }
-        // ... (validaciones de precioNum, cantidadNum, categoriaId como en POST) ...
         const precioNum = parseFloat(precio_unitario);
         const cantidadNum = parseInt(cantidad, 10);
         const categoriaId = ID_Categoria ? parseInt(ID_Categoria, 10) : null;
-        // Validaciones omitidas por brevedad, pero deben estar aquí.
+
+        if (isNaN(precioNum) || precioNum < 0) return res.status(400).json({ success: false, message: 'Precio inválido.' });
+        if (isNaN(cantidadNum) || cantidadNum < 0) return res.status(400).json({ success: false, message: 'Cantidad inválida.' });
+        if (ID_Categoria && isNaN(categoriaId)) return res.status(400).json({ success: false, message: 'ID Categoría inválido.' });
+
 
         const sql = `UPDATE producto SET Nombre = ?, Descripcion = ?, precio_unitario = ?, Marca = ?, Codigo_Barras = ?, ID_Categoria = ?, cantidad = ?, imagen_url = ?, imagen_url_2 = ?, imagen_url_3 = ?, imagen_url_4 = ?, imagen_url_5 = ? WHERE ID_Producto = ?`;
         const values = [Nombre, Descripcion || null, precioNum, Marca, Codigo_Barras || null, categoriaId, cantidadNum, imagen_url || null, imagen_url_2 || null, imagen_url_3 || null, imagen_url_4 || null, imagen_url_5 || null, id];
@@ -603,13 +628,13 @@ app.get('/api/admin/users', checkAdmin, async (req, res) => {
         const [users] = await dbPool.query('SELECT id, username, email, role FROM usuarios ORDER BY id DESC');
         res.status(200).json(users);
     } catch (error) {
-        console.error("!!! Error GET /api/admin/users:", error); // Añadido para mejor log
+        console.error("!!! Error GET /api/admin/users:", error); 
         res.status(500).json({ success: false, message: "Error al obtener usuarios." });
     }
 });
 
 
-// SETTINGS (GET, PUT) - Ya modificado para usar BD
+// SETTINGS
 app.get('/api/admin/settings', checkAdmin, (req, res) => {
     console.log("--> GET /api/admin/settings");
     res.status(200).json({ success: true, settings: siteSettings });
@@ -631,12 +656,10 @@ app.put('/api/admin/settings', checkAdmin, async (req, res) => {
 
     for (const key in newSettings) {
         if (allowedKeys.includes(key) && newSettings[key] !== undefined) {
-            // Simple validación de color
             if (key.startsWith('color') && typeof newSettings[key] === 'string' && !/^#[0-9A-Fa-f]{3}([0-9A-Fa-f]{3})?$/.test(newSettings[key])) {
                 console.warn(`\tIgnorando setting '${key}' por formato de color inválido: ${newSettings[key]}`);
                 continue;
             }
-            // Simple validación de URL social
             if (key.startsWith('social') && typeof newSettings[key] === 'string' && newSettings[key] && !newSettings[key].startsWith('http')) {
                  console.warn(`\tIgnorando setting '${key}' por formato de URL inválido (debe empezar con http/https): ${newSettings[key]}`);
                  continue;
@@ -645,8 +668,8 @@ app.put('/api/admin/settings', checkAdmin, async (req, res) => {
             const valueToStore = typeof newSettings[key] === 'string' ? newSettings[key].trim() : newSettings[key];
             const finalValue = (valueToStore === null || valueToStore === undefined) ? '' : valueToStore;
 
-            if (siteSettings[key] !== finalValue) { // Solo actualizar si hay un cambio real
-                siteSettings[key] = finalValue; // Actualizar en memoria
+            if (siteSettings[key] !== finalValue) { 
+                siteSettings[key] = finalValue; 
                 changesMade = true;
                 dbOperations.push(
                     dbPool.query(
@@ -668,10 +691,9 @@ app.put('/api/admin/settings', checkAdmin, async (req, res) => {
             res.status(200).json({ success: true, message: 'Configuración actualizada.', settings: siteSettings });
         } catch (error) {
             console.error("!!! Error al guardar settings en la DB:", error);
-            // No revertir siteSettings en memoria aquí, ya que algunos podrían haberse guardado. Frontend debe re-solicitar.
             res.status(500).json({ success: false, message: 'Error al guardar la configuración en la base de datos.'});
         }
-    } else if (changesMade) { // Cambios en memoria (ej. undefined a ''), pero no operaciones de BD
+    } else if (changesMade) { 
         console.log("\t<-- No se realizaron cambios que requirieran actualización de base de datos, pero settings en memoria actualizados.");
         res.status(200).json({ success: true, message: 'Configuración actualizada (sin cambios en BD).', settings: siteSettings });
     }
@@ -682,7 +704,7 @@ app.put('/api/admin/settings', checkAdmin, async (req, res) => {
 });
 
 
-// PEDIDOS (GET all, GET one, PUT status)
+// PEDIDOS
 app.get('/api/admin/orders', checkAdmin, async (req, res) => {
     console.log("--> GET /api/admin/orders");
     try {
@@ -706,7 +728,7 @@ app.get('/api/admin/orders/:id', checkAdmin, async (req, res) => {
     console.log(`--> GET /api/admin/orders/${pedidoId}`);
     if (isNaN(pedidoId)) return res.status(400).json({ success: false, message: "ID de pedido inválido." });
     try {
-        const [pedidoInfo] = await dbPool.query(
+        const [pedidoInfo] = await dbPool.query( // Query is already p.*
             `SELECT p.*, COALESCE(u.username, p.Nombre_Cliente_Envio) as Cliente_Nombre, COALESCE(u.email, p.Email_Cliente_Envio) as Cliente_Email
              FROM pedidos p
              LEFT JOIN usuarios u ON p.ID_Usuario = u.id
@@ -735,7 +757,6 @@ app.put('/api/admin/orders/:id/status', checkAdmin, async (req, res) => {
         return res.status(400).json({ success: false, message: "Estado de pedido inválido." });
     }
     try {
-        // Aquí podrías añadir lógica adicional, ej: si se cancela un pedido contra entrega no enviado, reponer stock.
         const [result] = await dbPool.query('UPDATE pedidos SET Estado_Pedido = ? WHERE ID_Pedido = ?', [nuevoEstado, pedidoId]);
         if (result.affectedRows === 0) return res.status(404).json({ success: false, message: "Pedido no encontrado." });
         res.status(200).json({ success: true, message: "Estado del pedido actualizado." });
@@ -745,7 +766,7 @@ app.put('/api/admin/orders/:id/status', checkAdmin, async (req, res) => {
     }
 });
 
-// ANALÍTICAS (Ejemplos: sales-overview, product-views)
+// ANALÍTICAS
 app.get('/api/admin/analytics/sales-overview', checkAdmin, async (req, res) => {
     console.log("--> GET /api/admin/analytics/sales-overview");
     try {
@@ -780,7 +801,7 @@ app.get('/api/admin/analytics/product-views', checkAdmin, async (req, res) => {
              FROM vistas_producto vp
              JOIN producto p ON vp.ID_Producto = p.ID_Producto
              GROUP BY vp.ID_Producto, p.Nombre
-             ORDER BY total_vistas DESC LIMIT 20` // Top 20 más vistos
+             ORDER BY total_vistas DESC LIMIT 20` 
         );
         res.status(200).json(productViews);
     } catch (error) {
@@ -790,13 +811,12 @@ app.get('/api/admin/analytics/product-views', checkAdmin, async (req, res) => {
 });
 
 
-// MENSAJES DE CONTACTO (GET all)
+// MENSAJES DE CONTACTO
 app.get('/api/admin/contact-messages', checkAdmin, async (req, res) => {
     console.log("--> GET /api/admin/contact-messages");
     try {
         const [messages] = await dbPool.query(
-            // 'SELECT id, name, email, LEFT(message, 100) as message_preview, created_at, status FROM contact_messages ORDER BY created_at DESC'
-            'SELECT id, name, email, LEFT(message, 100) as message_preview, created_at FROM contact_messages ORDER BY created_at DESC' // Sin status por ahora
+            'SELECT id, name, email, subject, LEFT(message, 100) as message_preview, created_at FROM contact_messages ORDER BY created_at DESC'
         );
         res.status(200).json(messages);
     } catch (error) {

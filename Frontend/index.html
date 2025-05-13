@@ -13,7 +13,7 @@
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
     <script src="https://checkout.wompi.co/widget.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> <!-- Added Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         /* --- VARIABLES CSS --- */
         :root {
@@ -197,8 +197,8 @@
             box-shadow: 0 1px 0 var(--color-gray-darker), 0 2px 3px rgba(0, 0, 0, 0.1);
         }
         
-        .btn-success { /* Added for COD button */
-            background-color: var(--color-secondary); /* Using secondary as success for now */
+        .btn-success { 
+            background-color: var(--color-secondary); 
             color: white;
             border-color: var(--color-secondary);
             box-shadow: 0 3px 0 var(--color-secondary-darker), 0 4px 6px rgba(0,0,0,0.1);
@@ -578,19 +578,15 @@
             transform: rotate(180deg);
         }
 
-        /* Admin Forms */
+        /* Admin Forms & COD Form */
         #admin-product-form label,
         #personalize-section label,
-        #cod-form label { /* Added #cod-form label */
+        #cod-form label { 
             font-weight: 500;
             display: block;
-            /* Tailwind: block */
             margin-bottom: 0.5rem;
-            /* Tailwind: mb-2 */
             color: #374151;
-            /* Tailwind: text-gray-700 */
             font-size: 0.875rem;
-            /* Tailwind: text-sm */
         }
 
         #admin-product-form input,
@@ -598,25 +594,29 @@
         #admin-product-form select,
         #personalize-section input[type="text"],
         #personalize-section textarea,
-        #cod-form input[type="text"], /* Added */
-        #cod-form input[type="tel"],  /* Added */
-        #cod-form input[type="email"],/* Added */
-        #cod-form textarea {          /* Added */
+        #cod-form input[type="text"], 
+        #cod-form input[type="tel"],  
+        #cod-form input[type="email"],
+        #cod-form textarea {          
             width: 100%;
-            /* Tailwind: w-full */
-            padding: 0.5rem 0.75rem;
-            /* Tailwind: py-2 px-3 */
+            padding: 0.5rem 0.75rem; /* Adjusted padding for COD form, was p-2 */
             border: 1px solid #d1d5db;
-            /* Tailwind: border-gray-300 */
-            border-radius: 0.375rem;
-            /* Tailwind: rounded-md */
-            margin-bottom: 1rem;
-            /* Tailwind: mb-4 (adjust as needed) */
-            box-shadow: inset 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            border-radius: 0.375rem; /* rounded-md */
+            /* margin-bottom: 1rem; Removed default mb for finer control in COD form */
+            box-shadow: inset 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* shadow-sm for COD */
             background-color: #ffffff;
             color: #1f2937;
             font-size: 0.875rem;
         }
+         /* Specific margin for admin forms if needed, COD uses space-y */
+        #admin-product-form input, 
+        #admin-product-form textarea, 
+        #admin-product-form select,
+        #personalize-section input[type="text"],
+        #personalize-section textarea {
+            margin-bottom: 1rem;
+        }
+
 
         #admin-product-form input:focus,
         #admin-product-form textarea:focus,
@@ -627,13 +627,11 @@
         #register-section input:focus,
         #contact-section input:focus,
         #contact-section textarea:focus,
-        #cod-form input:focus,      /* Added */
-        #cod-form textarea:focus {  /* Added */
+        #cod-form input:focus,      
+        #cod-form textarea:focus {  
             outline: none;
             border-color: var(--color-primary) !important;
-            /* Tailwind: focus:border-primary */
             box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 30%, transparent) !important;
-            /* Tailwind: focus:ring-primary focus:ring-opacity-50 */
         }
 
         #admin-product-form textarea,
@@ -1672,9 +1670,8 @@
         const cartItemCountDesktop = document.getElementById('cart-item-count-desktop');
         const cartItemCountMobileIcon = document.getElementById('cart-item-count-mobile-icon');
         const cartItemCountMobileMenu = document.getElementById('cart-item-count-mobile-menu');
-        // const checkoutButton = document.getElementById('checkout-button'); // Will be dynamically created
-        const paymentButtonContainer = document.getElementById('payment-button-container'); // Container for payment options
-        const cartCheckoutMessage = document.getElementById('payment-result-message'); // Re-using existing for Wompi general messages
+        const paymentButtonContainer = document.getElementById('payment-button-container'); 
+        const cartCheckoutMessage = document.getElementById('payment-result-message'); 
         const cartMessageDiv = document.getElementById('cart-message');
 
 
@@ -1746,24 +1743,24 @@
         const socialYoutubeInput = document.getElementById('setting-socialYoutube');
         const saveContactSocialButton = document.getElementById('save-contact-social-button');
 
-        // Admin - Product Stats (New)
+        // Admin - Product Stats 
         const adminProductStatsSection = document.getElementById('admin-product-stats-section');
         const adminProductViewsContainer = document.getElementById('product-views-container');
         const adminProductViewsMessageDiv = document.getElementById('admin-product-views-message');
 
-        // Admin - Orders (New)
+        // Admin - Orders 
         const adminOrdersSection = document.getElementById('admin-orders-section');
         const adminOrdersListContainer = document.getElementById('admin-orders-list-container');
         const adminOrderDetailContainer = document.getElementById('admin-order-detail-container');
         const adminOrdersMessageDiv = document.getElementById('admin-orders-message');
 
-        // Admin - Analytics (New)
+        // Admin - Analytics 
         const adminAnalyticsSection = document.getElementById('admin-analytics-section');
         const adminAnalyticsMessageDiv = document.getElementById('admin-analytics-message');
         let dailySalesChartInstance = null;
         let topProductsChartInstance = null;
         
-        // Admin - Customers (New)
+        // Admin - Customers 
         const adminCustomersSection = document.getElementById('admin-customers-section');
         const adminCustomersListContainer = document.getElementById('admin-customers-list-container');
         const adminCustomersMessageDiv = document.getElementById('admin-customers-message');
@@ -1774,8 +1771,6 @@
         const modalImage = document.getElementById('modalImage');
 
         // --- FUNCIONES UTILITARIAS ---
-        // ... (Keep all existing utility functions: showMessage, hideMessages, darkenColor, formatCOP) ...
-        // --- (Copied from original for completeness) ---
         function showMessage(element, message, isError = true) {
             if (!element) { console.warn("showMessage: Elemento nulo."); return; }
             element.textContent = message;
@@ -1831,8 +1826,6 @@
         }
 
         // --- FUNCIONES DEL CARRITO ---
-        // ... (Keep all existing cart functions: getCart, saveCart, addToCart, removeFromCart, updateCartQuantity, calculateCartTotals, updateCartIcon) ...
-        // --- (Copied from original for completeness, addToCart modified slightly for stock checking) ---
         function getCart() {
             const cartJson = localStorage.getItem(CART_STORAGE_KEY);
             try {
@@ -1869,7 +1862,7 @@
             const stock = product.cantidad ?? 0;
             const existingItemIndex = cart.findIndex(item => item.productId == productId);
 
-            if (stock <= 0 && existingItemIndex === -1) { // Only show "agotado" if not already in cart
+            if (stock <= 0 && existingItemIndex === -1) { 
                 showMessage(cartMessageDiv || pageContent.querySelector('.message') || pageContent, `"${product.Nombre}" agotado.`, true);
                 if (buttonElement) {
                     buttonElement.disabled = true;
@@ -1885,7 +1878,7 @@
                 const currentQtyInCart = cart[existingItemIndex].quantity;
                 const potentialTotalQty = currentQtyInCart + quantity;
                 if (potentialTotalQty > stock) {
-                    addedQty = stock - currentQtyInCart; // Max quantity that can be added
+                    addedQty = stock - currentQtyInCart; 
                     if (addedQty > 0) {
                         cart[existingItemIndex].quantity = stock;
                          showMessage(cartMessageDiv || pageContent.querySelector('.message') || pageContent, `Stock máximo (${stock}) alcanzado para "${product.Nombre}". ${addedQty} más añadido(s).`, false);
@@ -1896,9 +1889,9 @@
                     cart[existingItemIndex].quantity = potentialTotalQty;
                     addedQty = quantity;
                 }
-            } else { // Item not in cart
+            } else { 
                 if (quantity > stock) {
-                    addedQty = stock; // Add available stock
+                    addedQty = stock; 
                      if (addedQty > 0) {
                         cart.push({ productId: parseInt(productId), quantity: stock, price: product.precio_unitario, name: product.Nombre, imageUrl: product.imagen_url, stock: stock });
                         showMessage(cartMessageDiv || pageContent.querySelector('.message') || pageContent, `Stock insuficiente (${stock}) para "${product.Nombre}". Añadido: ${addedQty}.`, true);
@@ -1923,7 +1916,6 @@
                         if (buttonElement?.classList.contains('added-feedback')) {
                             buttonElement.innerHTML = originalHtml;
                             buttonElement.className = originalClasses;
-                            // Re-check stock and disable if necessary
                             const latestCartItem = getCart().find(i => i.productId == productId);
                             const cartQty = latestCartItem?.quantity ?? 0;
                             buttonElement.disabled = (cartQty >= stock);
@@ -1937,8 +1929,7 @@
                 } else {
                     showMessage(cartMessageDiv || pageContent.querySelector('.message') || pageContent, '¡Producto añadido!', false);
                 }
-            } else if (buttonElement && stock <=0 && existingItemIndex === -1) { // Handle if tried to add 0 of out of stock item
-                 // Message already shown if stock is 0 and item not in cart.
+            } else if (buttonElement && stock <=0 && existingItemIndex === -1) { 
             }
         }
         function removeFromCart(productId) {
@@ -2000,11 +1991,10 @@
             });
         }
 
-        // --- LOG PRODUCT VIEW (New) ---
+        // --- LOG PRODUCT VIEW ---
         async function logProductView(productId) {
             try {
                 await fetch(`${API_URL}/api/products/${productId}/view`, { method: 'POST' });
-                // console.log(`Vista registrada para producto ID: ${productId}`); // Opcional
             } catch (error) {
                 console.warn(`Error al registrar vista para producto ID ${productId}:`, error);
             }
@@ -2028,7 +2018,7 @@
                 if (wompiBtn) wompiBtn.style.display = 'none';
                 const codBtn = document.getElementById('cod-checkout-btn');
                 if (codBtn) codBtn.style.display = 'none';
-                 if (paymentButtonContainer) paymentButtonContainer.innerHTML = ''; // Clear payment options
+                 if (paymentButtonContainer) paymentButtonContainer.innerHTML = ''; 
 
             } else {
                 const { subtotal, total } = calculateCartTotals();
@@ -2067,7 +2057,6 @@
                 cartTotalSpan.textContent = formatCOP(total);
                 cartSummaryAndCheckout.style.display = 'block';
 
-                // Payment options logic
                 const paymentOptionsDiv = document.createElement('div');
                 paymentOptionsDiv.className = 'mt-6 border-t pt-6';
                 paymentOptionsDiv.innerHTML = `
@@ -2078,22 +2067,36 @@
                     </div>
                     <div id="cod-form-container" style="display:none;" class="mt-4 p-4 border rounded bg-gray-50">
                         <h5 class="font-semibold mb-2">Datos para Pago Contra Entrega:</h5>
-                        <form id="cod-form">
-                            <div class="mb-3">
-                                <label for="cod-name">Nombre Completo</label>
-                                <input type="text" id="cod-name" name="cod-name" required>
+                        <form id="cod-form" class="space-y-3">
+                            <div>
+                                <label for="cod-name">Nombre Completo*</label>
+                                <input type="text" id="cod-name" name="cod-name" required >
                             </div>
-                            <div class="mb-3">
-                                <label for="cod-phone">Teléfono</label>
-                                <input type="tel" id="cod-phone" name="cod-phone" required>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="cod-department">Departamento*</label>
+                                    <input type="text" id="cod-department" name="cod-department" required >
+                                </div>
+                                <div>
+                                    <label for="cod-city">Ciudad*</label>
+                                    <input type="text" id="cod-city" name="cod-city" required >
+                                </div>
                             </div>
-                            <div class="mb-3">
-                                <label for="cod-address">Dirección Completa (Calle, Número, Ciudad)</label>
-                                <textarea id="cod-address" name="cod-address" rows="3" required></textarea>
+                            <div>
+                                <label for="cod-address">Dirección Completa (Calle, Número, Barrio)*</label>
+                                <textarea id="cod-address" name="cod-address" rows="2" required ></textarea>
                             </div>
-                             <div class="mb-3">
-                                <label for="cod-email">Correo Electrónico</label>
-                                <input type="email" id="cod-email" name="cod-email" required>
+                            <div>
+                                <label for="cod-reference-point">Punto de Referencia (Opcional)</label>
+                                <textarea id="cod-reference-point" name="cod-reference-point" rows="2" ></textarea>
+                            </div>
+                            <div>
+                                <label for="cod-phone">Teléfono*</label>
+                                <input type="tel" id="cod-phone" name="cod-phone" required >
+                            </div>
+                            <div>
+                                <label for="cod-email">Correo Electrónico*</label>
+                                <input type="email" id="cod-email" name="cod-email" required >
                             </div>
                             <button type="submit" class="btn btn-success w-full">Confirmar Pedido Contra Entrega</button>
                         </form>
@@ -2103,10 +2106,10 @@
                          <p id="payment-result-message" class="message mt-2 text-center"></p>
                     </div>`;
                 
-                if (paymentButtonContainer) { // Ensure paymentButtonContainer exists
-                    paymentButtonContainer.innerHTML = ''; // Clear previous content
+                if (paymentButtonContainer) { 
+                    paymentButtonContainer.innerHTML = ''; 
                     paymentButtonContainer.appendChild(paymentOptionsDiv);
-                } else { // Fallback if it was removed or not found
+                } else { 
                     cartSummaryAndCheckout.appendChild(paymentOptionsDiv);
                 }
 
@@ -2129,29 +2132,34 @@
                 codForm?.addEventListener('submit', handleCashOnDeliverySubmit);
                 
                 hideMessages(cartMessageDiv);
-                 if (cartCheckoutMessage) hideMessages(cartCheckoutMessage); // Hide Wompi message if cart is re-rendered
+                 if (cartCheckoutMessage) hideMessages(cartCheckoutMessage); 
             }
         }
         
-        // --- CASH ON DELIVERY SUBMIT (New) ---
+        // --- CASH ON DELIVERY SUBMIT ---
         async function handleCashOnDeliverySubmit(event) {
             event.preventDefault();
             const codMessageDiv = document.getElementById('cod-message');
-            hideMessages(codMessageDiv);
+            if(codMessageDiv) hideMessages(codMessageDiv);
 
             const customerInfo = {
-                name: document.getElementById('cod-name').value,
-                phone: document.getElementById('cod-phone').value,
-                address: document.getElementById('cod-address').value,
-                email: document.getElementById('cod-email').value,
+                name: document.getElementById('cod-name')?.value.trim(),
+                department: document.getElementById('cod-department')?.value.trim(), 
+                city: document.getElementById('cod-city')?.value.trim(),            
+                address: document.getElementById('cod-address')?.value.trim(),
+                referencePoint: document.getElementById('cod-reference-point')?.value.trim() || null, 
+                phone: document.getElementById('cod-phone')?.value.trim(),
+                email: document.getElementById('cod-email')?.value.trim(),
             };
 
-            if (!customerInfo.name || !customerInfo.phone || !customerInfo.address || !customerInfo.email) {
-                showMessage(codMessageDiv, "Por favor, completa todos los datos para el envío.", true);
+            if (!customerInfo.name || !customerInfo.phone || !customerInfo.address || 
+                !customerInfo.department || !customerInfo.city || 
+                !customerInfo.email) {
+                if(codMessageDiv) showMessage(codMessageDiv, "Por favor, completa todos los datos requeridos (*) para el envío.", true);
                 return;
             }
 
-            const cart = getCart().map(item => {
+            const cartForBackend = getCart().map(item => {
                 const productDetails = allProducts.find(p => p.ID_Producto == item.productId);
                 return {
                     productId: item.productId,
@@ -2162,14 +2170,19 @@
                 };
             });
 
+            if (cartForBackend.length === 0) {
+                 if(codMessageDiv) showMessage(codMessageDiv, "Tu carrito está vacío.", true);
+                 return;
+            }
+
             const submitButton = event.target.querySelector('button[type="submit"]');
-            if(submitButton) { submitButton.disabled = true; submitButton.textContent = 'Procesando...';}
+            if(submitButton) { submitButton.disabled = true; submitButton.textContent = 'Procesando...'; }
 
             try {
                 const response = await fetch(`${API_URL}/api/orders/cash-on-delivery`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ cart, customerInfo })
+                    body: JSON.stringify({ cart: cartForBackend, customerInfo })
                 });
                 const result = await response.json();
 
@@ -2177,32 +2190,31 @@
                     throw new Error(result.message || `Error ${response.status}`);
                 }
 
-                showMessage(codMessageDiv, "¡Pedido contra entrega recibido! Nos pondremos en contacto contigo pronto.", false);
-                event.target.reset();
+                if(codMessageDiv) showMessage(codMessageDiv, "¡Pedido contra entrega recibido! Nos pondremos en contacto contigo pronto. Tu carrito ha sido vaciado.", false);
+                event.target.reset(); 
                 
-                const codFormCont = document.getElementById('cod-form-container');
-                if(codFormCont) codFormCont.style.display = 'none';
-                const wompiBtn = document.getElementById('wompi-checkout-btn');
-                if(wompiBtn) wompiBtn.style.display = 'block';
-                const codBtn = document.getElementById('cod-checkout-btn');
-                if(codBtn) codBtn.style.display = 'block';
+                const codFormContainerEl = document.getElementById('cod-form-container');
+                const wompiCheckoutBtnElem = document.getElementById('wompi-checkout-btn');
+                const codCheckoutBtnElem = document.getElementById('cod-checkout-btn');
 
-                saveCart([]); 
-                renderCartPage(); 
+                if(codFormContainerEl) codFormContainerEl.style.display = 'none';
+                if(wompiCheckoutBtnElem) wompiCheckoutBtnElem.style.display = 'block'; 
+                if(codCheckoutBtnElem) codCheckoutBtnElem.style.display = 'block'; 
+
+                saveCart([]);
+                renderCartPage();
                 updateCartIcon();
 
             } catch (error) {
                 console.error("Error al enviar pedido contra entrega:", error);
-                showMessage(codMessageDiv, `Error al procesar tu pedido: ${error.message}`, true);
+                if(codMessageDiv) showMessage(codMessageDiv, `Error al procesar tu pedido: ${error.message}`, true);
             } finally {
-                if(submitButton) { submitButton.disabled = false; submitButton.textContent = 'Confirmar Pedido Contra Entrega';}
+                if(submitButton) { submitButton.disabled = false; submitButton.textContent = 'Confirmar Pedido Contra Entrega'; }
             }
         }
 
 
         // --- FUNCIONES DE RENDERIZADO (PRODUCTOS, CATEGORÍAS, ETC.) ---
-        // ... (Keep all existing rendering functions: renderProductCard, renderProductGrid, renderFeaturedProducts, renderProductDetailContent, renderProductDetail, renderCategories) ...
-        // --- (Modified renderProductDetailContent to call logProductView) ---
         function renderProductCard(product) {
             const div = document.createElement("div");
             div.className = `product-card`; 
@@ -2295,7 +2307,6 @@
                     toggleBtn.textContent = isHidden ? 'Ocultar Descripción' : 'Ver Descripción';
                 });
             }
-            // Log product view
             if (product && product.ID_Producto) {
                  logProductView(product.ID_Producto);
             }
@@ -2353,8 +2364,6 @@
         }
 
         // --- FUNCIONES DE CARGA DE DATOS ---
-        // ... (Keep all existing data loading functions: loadAndStorePublicProducts, loadSiteSettings, loadAdminProducts, loadCategoriesIntoSelect) ...
-        // --- (Copied from original for completeness) ---
         async function loadAndStorePublicProducts() {
             if (productsLoaded && allProducts.length > 0) return true;
             console.log("Cargando productos públicos...");
@@ -2447,7 +2456,7 @@
             }
         }
         
-        // --- ADMIN PRODUCT STATS (New) ---
+        // --- ADMIN PRODUCT STATS ---
         async function loadAndRenderProductViews() {
             if (!adminProductViewsContainer) return;
             adminProductViewsContainer.innerHTML = '<p class="p-4 text-center text-gray-500">Cargando estadísticas de vistas...</p>';
@@ -2487,7 +2496,7 @@
             }
         }
 
-        // --- ADMIN ORDER MANAGEMENT (New) ---
+        // --- ADMIN ORDER MANAGEMENT (Modified for new shipping fields) ---
         async function loadAndRenderAdminOrders() {
             if (!adminOrdersListContainer) return;
             adminOrdersListContainer.innerHTML = '<p class="p-4 text-center text-gray-500">Cargando pedidos...</p>';
@@ -2556,14 +2565,26 @@
                         <h3 class="text-2xl font-semibold">Detalle Pedido #${order.ID_Pedido}</h3>
                         <button id="close-order-detail-btn" class="btn btn-sm btn-gray">Cerrar Detalle</button>
                     </div>
-                    <p><strong>Fecha:</strong> ${new Date(order.Fecha_Pedido).toLocaleString()}</p>
-                    <p><strong>Cliente:</strong> ${order.Cliente_Nombre || 'N/A'} (${order.Cliente_Email || 'N/A'})</p>
-                    <p><strong>Total:</strong> ${formatCOP(order.Total_Pedido)}</p>
-                    <p><strong>Método de Pago:</strong> ${order.Metodo_Pago || 'N/A'}</p>
-                    <p><strong>Referencia Pago:</strong> ${order.Referencia_Pago || '-'}</p>
-                    <p><strong>Nombre Envío:</strong> ${order.Nombre_Cliente_Envio || 'N/A'}</p>
-                    <p><strong>Dirección Envío:</strong> ${order.Direccion_Envio || 'N/A'}</p>
-                    <p><strong>Teléfono Envío:</strong> ${order.Telefono_Cliente_Envio || 'N/A'}</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <p><strong>Fecha:</strong> ${new Date(order.Fecha_Pedido).toLocaleString()}</p>
+                            <p><strong>Cliente (Registrado):</strong> ${order.ID_Usuario ? `${order.Cliente_Nombre} (ID: ${order.ID_Usuario})` : 'No registrado'}</p>
+                            <p><strong>Email (Registrado):</strong> ${order.ID_Usuario ? order.Cliente_Email : 'N/A'}</p>
+                            <p><strong>Total:</strong> ${formatCOP(order.Total_Pedido)}</p>
+                            <p><strong>Método de Pago:</strong> ${order.Metodo_Pago || 'N/A'}</p>
+                            <p><strong>Referencia Pago:</strong> ${order.Referencia_Pago || '-'}</p>
+                        </div>
+                        <div>
+                            <h5 class="font-semibold text-gray-700">Información de Envío:</h5>
+                            <p><strong>Nombre:</strong> ${order.Nombre_Cliente_Envio || 'N/A'}</p>
+                            <p><strong>Email:</strong> ${order.Email_Cliente_Envio || 'N/A'}</p>
+                            <p><strong>Teléfono:</strong> ${order.Telefono_Cliente_Envio || 'N/A'}</p>
+                            <p><strong>Departamento:</strong> ${order.Departamento_Envio || 'N/A'}</p>
+                            <p><strong>Ciudad:</strong> ${order.Ciudad_Envio || 'N/A'}</p>
+                            <p><strong>Dirección:</strong> ${order.Direccion_Envio || 'N/A'}</p>
+                            <p><strong>Referencia:</strong> ${order.Punto_Referencia_Envio || 'Ninguno'}</p>
+                        </div>
+                    </div>
                     <div class="mt-2">
                         <strong>Estado Actual:</strong> <span id="current-order-status">${order.Estado_Pedido}</span>
                         <select id="update-order-status-select" class="ml-2 border rounded p-1">
@@ -2573,7 +2594,7 @@
                             <option value="Enviado" ${order.Estado_Pedido === 'Enviado' ? 'selected' : ''}>Enviado</option>
                             <option value="Entregado" ${order.Estado_Pedido === 'Entregado' ? 'selected' : ''}>Entregado</option>
                             <option value="Cancelado" ${order.Estado_Pedido === 'Cancelado' ? 'selected' : ''}>Cancelado</option>
-                             <option value="Pendiente de Confirmacion" ${order.Estado_Pedido === 'Pendiente de Confirmacion' ? 'selected' : ''}>Pendiente de Confirmacion (ContraEntrega)</option>
+                            <option value="Pendiente de Confirmacion" ${order.Estado_Pedido === 'Pendiente de Confirmacion' ? 'selected' : ''}>Pendiente de Confirmacion (ContraEntrega)</option>
                         </select>
                         <button id="update-order-status-btn" data-order-id="${order.ID_Pedido}" class="btn btn-sm btn-primary ml-2">Actualizar Estado</button>
                     </div>
@@ -2628,7 +2649,6 @@
                 showMessage(adminOrdersMessageDiv, 'Estado del pedido actualizado con éxito.', false);
                 const currentStatusEl = document.getElementById('current-order-status');
                 if(currentStatusEl) currentStatusEl.textContent = newStatus;
-                // loadAndRenderAdminOrders(); // Consider if needed to refresh main list
             } catch (error) {
                 console.error(`Error actualizando estado del pedido ${orderId}:`, error);
                 showMessage(adminOrdersMessageDiv, `Error al actualizar estado: ${error.message}`, true);
@@ -2637,7 +2657,7 @@
             }
         }
 
-        // --- ADMIN ANALYTICS (New) ---
+        // --- ADMIN ANALYTICS ---
         async function loadAndRenderAnalytics() {
             hideMessages(adminAnalyticsMessageDiv);
             if (dailySalesChartInstance) dailySalesChartInstance.destroy();
@@ -2688,7 +2708,7 @@
             }
         }
         
-        // --- ADMIN CUSTOMERS (New) ---
+        // --- ADMIN CUSTOMERS ---
         async function loadAndRenderAdminCustomers() {
             if (!adminCustomersListContainer) return;
             adminCustomersListContainer.innerHTML = '<p class="p-4 text-center text-gray-500">Cargando clientes...</p>';
@@ -2723,7 +2743,7 @@
         }
 
 
-        // --- FUNCIONES DE NAVEGACIÓN Y UI (Modified) ---
+        // --- FUNCIONES DE NAVEGACIÓN Y UI ---
         async function showPageSection(sectionId, detailId = null) {
             console.log(`Nav -> ${sectionId}${detailId ? ` (${detailId})` : ''}`);
             hideMessages();
@@ -2753,7 +2773,6 @@
                 console.log(`Cargando settings para ${sectionId}...`);
                 await loadSiteSettings();
             }
-            // Specific data loading for admin sections will happen within their "show" logic below
 
             let sectionToShow;
             if (adminSubSections.includes(sectionId)) {
@@ -2822,8 +2841,6 @@
             }
             window.scrollTo(0, 0);
         }
-        // ... (Keep updateUI, handleCheckout, loadFrontendConfig) ...
-        // --- (Copied from original for completeness) ---
         function updateUI(isLoggedIn) {
             console.log("Updating UI, LoggedIn:", isLoggedIn);
             const userRole = localStorage.getItem('userRole');
@@ -2844,15 +2861,15 @@
             if (adminMenuMobileContainer) adminMenuMobileContainer.style.display = isAdmin ? 'block' : 'none';
             console.log("UI Updated.");
         }
-        async function handleCheckout() {
+        async function handleCheckout() { // This is for Wompi
             console.log(">>> [Checkout Wompi COP] Iniciando...");
             if (!configLoaded) {
-                showMessage(cartCheckoutMessage, 'Error: Configuración de pago no cargada.', true);
+                showMessage(cartCheckoutMessage || document.getElementById('payment-result-message'), 'Error: Configuración de pago no cargada.', true);
                 console.error("Checkout Wompi Error: Configuración no cargada.");
                 return;
             }
             if (!wompiPublicKey || !frontendBaseUrl) {
-                showMessage(cartCheckoutMessage, 'Error: Falta configuración de pago.', true);
+                showMessage(cartCheckoutMessage || document.getElementById('payment-result-message'), 'Error: Falta configuración de pago.', true);
                 console.error("Checkout Wompi Error: Falta wompiPublicKey o frontendBaseUrl.");
                 return;
             }
@@ -2868,7 +2885,7 @@
             const totalInCents = Math.round(total * 100); 
             const redirectUrl = `${frontendBaseUrl}/payment-status.html`; 
             
-            const wompiCheckoutBtn = document.getElementById('wompi-checkout-btn'); // Get the Wompi button
+            const wompiCheckoutBtn = document.getElementById('wompi-checkout-btn'); 
             showMessage(cartCheckoutMessage || document.getElementById('payment-result-message'), 'Preparando checkout seguro con Wompi...', false);
             if (wompiCheckoutBtn) {
                 wompiCheckoutBtn.disabled = true;
@@ -2892,7 +2909,7 @@
                     console.log(">>> [Checkout Wompi COP] Widget cerrado o redirigido. Resultado:", result);
                     if (wompiCheckoutBtn) {
                         wompiCheckoutBtn.disabled = false;
-                        wompiCheckoutBtn.innerHTML = 'Pagar con Wompi (Tarjeta, PSE, etc.)'; // Reset Wompi button text
+                        wompiCheckoutBtn.innerHTML = 'Pagar con Wompi (Tarjeta, PSE, etc.)'; 
                         hideMessages(cartCheckoutMessage || document.getElementById('payment-result-message'));
                     }
                 });
@@ -2901,7 +2918,7 @@
                 showMessage(cartCheckoutMessage || document.getElementById('payment-result-message'), `Error: ${error.message}. Intenta de nuevo.`, true);
                 if (wompiCheckoutBtn) {
                     wompiCheckoutBtn.disabled = false;
-                    wompiCheckoutBtn.innerHTML = 'Pagar con Wompi (Tarjeta, PSE, etc.)'; // Reset Wompi button text
+                    wompiCheckoutBtn.innerHTML = 'Pagar con Wompi (Tarjeta, PSE, etc.)'; 
                 }
             }
         }
@@ -2935,8 +2952,6 @@
         }
 
         // --- FUNCIONES DE ADMINISTRACIÓN ---
-        // ... (Keep all existing admin functions: renderAdminProductTable, showAdminProductForm, handleEditProduct, showAdminProductList, handleDeleteProduct, applySiteSettings, applyColorSettings, applyTextSettings, applyContactInfo, populatePersonalizeForm, saveSiteSettings) ...
-        // --- (Copied from original for completeness) ---
         function renderAdminProductTable(products) {
             if (!adminProductsTableContainer) return;
             if (!products || products.length === 0) {
@@ -3162,7 +3177,6 @@
         }
         
         // --- MODAL DE IMAGEN ---
-        // ... (Keep openImageModal, closeImageModal, closeImageModalOnClick) ...
         function openImageModal(imageUrl) {
             if (imageModal && modalImage) {
                 modalImage.src = imageUrl;
@@ -3183,8 +3197,6 @@
 
 
         // --- MANEJADORES DE EVENTOS ---
-        // ... (Keep handleLogout, handleCategoryClick, handleGridOrDetailClick) ...
-        // --- (Copied from original for completeness) ---
         function handleLogout() {
             localStorage.removeItem("userLoggedIn");
             localStorage.removeItem("userEmail");
@@ -3198,8 +3210,6 @@
             if (card) {
                 const categoryId = card.getAttribute('data-category-id');
                 console.log("Category click:", categoryId);
-                // Here you could filter products by category if you had that logic
-                // For now, it just takes to the all products page
                 showPageSection('products'); 
             }
         }
@@ -3223,8 +3233,6 @@
         }
 
         // --- LÓGICA DE INICIALIZACIÓN DE LA APLICACIÓN ---
-        // ... (Keep entire DOMContentLoaded listener, but ensure new admin sections are handled in showPageSection and new event listeners are added) ...
-        // --- (Copied from original and modified for completeness) ---
         document.addEventListener("DOMContentLoaded", async () => {
             console.log(">>> DOM Cargado. Iniciando App Ferremax...");
             try {
@@ -3256,7 +3264,7 @@
                 console.log(">>> Actualizando Icono Carrito...");
                 updateCartIcon();
                 console.log(">>> Añadiendo Listeners...");
-                if (loginForm) { /* Login form listener */
+                if (loginForm) { 
                     loginForm.addEventListener("submit", async (event) => {
                         event.preventDefault(); hideMessages(loginMessageDiv);
                         const email = document.getElementById("login-email").value;
@@ -3275,7 +3283,7 @@
                         } finally { if (button) { button.disabled = false; button.textContent = 'Iniciar Sesión'; } }
                     });
                 }
-                if (registerForm) { /* Register form listener */
+                if (registerForm) { 
                     registerForm.addEventListener("submit", async (event) => {
                         event.preventDefault(); hideMessages(registerMessageDiv);
                         const username = document.getElementById("register-username").value; const email = document.getElementById("register-email").value; const password = document.getElementById("register-password").value;
@@ -3293,7 +3301,7 @@
                         } finally { if (button) { button.disabled = false; button.textContent = 'Registrarse'; } }
                     });
                 }
-                if (contactForm) { /* Contact form listener */
+                if (contactForm) { 
                      contactForm.addEventListener("submit", async (event) => {
                         event.preventDefault(); hideMessages(contactMessageResponseDiv);
                         if (!contactSubmitButton) return; contactSubmitButton.disabled = true; contactSubmitButton.textContent = "Enviando...";
@@ -3321,7 +3329,6 @@
                 if (pageContent) pageContent.addEventListener('click', handleGridOrDetailClick);
                 if (cartItemsContainer) { cartItemsContainer.addEventListener('change', (e) => { if (e.target.matches('.cart-item-qty-input')) { updateCartQuantity(e.target.dataset.productIdQty, e.target.value); } }); cartItemsContainer.addEventListener('click', (e) => { const removeButton = e.target.closest('.cart-item-remove-button'); if (removeButton) { removeFromCart(removeButton.dataset.productIdRemove); } }); }
                 if (categoryGridContainer) categoryGridContainer.addEventListener('click', handleCategoryClick);
-                // Checkout button listener is now inside renderCartPage due to dynamic creation
                 if (addProductButton) addProductButton.addEventListener('click', () => showAdminProductForm());
                 if (adminCancelButton) adminCancelButton.addEventListener('click', showAdminProductList);
                 if (adminProductForm) {
