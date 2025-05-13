@@ -44,10 +44,10 @@ let siteSettings = {
     contactAddress: 'Calle Falsa 123, Barranquilla, Colombia',
     contactPhone: '+57 300 123 4567',
     contactEmail: 'info@ferremax.example.com',
-    socialFacebook: '',
+    socialFacebook: 'https://www.facebook.com/share/19ra2fvR3q/?mibextid=wwXIfr',
     socialTwitter: '',
     socialInstagram: '',
-    socialYoutube: ''
+    socialYoutube: 'https://youtu.be/iQLCN3J3dt4?si=wiMZB-02ewAsQaFe'
 };
 console.log("--> Configuración inicial del sitio (simulada):", siteSettings);
 
