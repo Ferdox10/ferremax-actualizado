@@ -226,7 +226,9 @@
         .main-header .nav-link {
             color: #475569;
             font-weight: 500;
-            position: relative;
+            position: relative; /* Needed for notification badge relative positioning */
+            display: inline-flex; /* To align badge correctly */
+            align-items: center;
         }
 
         .main-header .nav-link:hover {
@@ -247,6 +249,24 @@
         .main-header .nav-link:hover::after {
             width: 100%;
         }
+        
+        /* Notification Badge for Admin Orders */
+        .admin-order-notification-badge {
+            margin-left: 0.25rem; /* Tailwind: ml-1 */
+            padding-left: 0.5rem; /* Tailwind: px-2 */
+            padding-right: 0.5rem;
+            padding-top: 0.125rem; /* Tailwind: py-0.5 */
+            padding-bottom: 0.125rem;
+            background-color: #ef4444; /* Tailwind: bg-red-500 */
+            color: white;
+            font-size: 0.75rem; /* Tailwind: text-xs */
+            font-weight: bold;
+            border-radius: 9999px; /* Tailwind: rounded-full */
+            line-height: 1; /* Ensures badge height is minimal */
+            min-width: 1.25rem; /* Consistent size for single digit */
+            text-align: center;
+        }
+
 
         .main-header .cart-icon-container {
             color: #475569;
@@ -599,22 +619,20 @@
         #cod-form input[type="email"],
         #cod-form textarea {          
             width: 100%;
-            padding: 0.5rem 0.75rem; /* Adjusted padding for COD form, was p-2 */
+            padding: 0.5rem 0.75rem; 
             border: 1px solid #d1d5db;
-            border-radius: 0.375rem; /* rounded-md */
-            /* margin-bottom: 1rem; Removed default mb for finer control in COD form */
-            box-shadow: inset 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* shadow-sm for COD */
+            border-radius: 0.375rem; 
+            box-shadow: inset 0 1px 2px 0 rgba(0, 0, 0, 0.05); 
             background-color: #ffffff;
             color: #1f2937;
             font-size: 0.875rem;
         }
-         /* Specific margin for admin forms if needed, COD uses space-y */
         #admin-product-form input, 
         #admin-product-form textarea, 
         #admin-product-form select,
         #personalize-section input[type="text"],
         #personalize-section textarea {
-            margin-bottom: 1rem;
+            margin-bottom: 1rem; /* Specific margin for these forms */
         }
 
 
@@ -693,7 +711,6 @@
         }
 
         .social-links a {
-            /* Estilo base para los íconos de redes sociales */
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -710,28 +727,18 @@
             transform: translateY(-2px);
         }
 
-        /* Colores específicos para redes (pueden ser sobreescritos por JS si vienen de
-        settings) */
         .social-links a.bg-blue-600:hover {
             background-color: #2563eb !important;
         }
-
-        /* Facebook example */
         .social-links a.bg-sky-500:hover {
             background-color: #0ea5e9 !important;
         }
-
-        /* Twitter example */
         .social-links a.bg-pink-600:hover {
             background-color: #db2777 !important;
         }
-
-        /* Instagram example */
         .social-links a.bg-red-600:hover {
             background-color: #dc2626 !important;
         }
-
-        /* YouTube example */
 
         /* Categories Section */
         #categories-section {
@@ -764,7 +771,7 @@
             text-align: center;
             box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
             transition: transform 0.2s ease, box-shadow 0.2s ease;
-            cursor: pointer; /* Added cursor */
+            cursor: pointer; 
         }
 
         .category-card:hover {
@@ -814,7 +821,7 @@
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -2px rgba(0, 0, 0, .1);
         }
 
-        .admin-table { /* Made more general */
+        .admin-table { 
             width: 100%;
             border-collapse: collapse;
             margin-top: 1.5rem;
@@ -839,7 +846,7 @@
             color: #1f2937;
         }
 
-        #admin-products-section .admin-table img.product-thumbnail { /* Kept specific for product images */
+        #admin-products-section .admin-table img.product-thumbnail { 
             max-height: 50px;
             width: auto;
             display: block;
@@ -847,7 +854,7 @@
             background-color: #f9fafb;
         }
 
-        .admin-action-button { /* Made more general */
+        .admin-action-button { 
             padding: 0.3rem 0.6rem;
             border-radius: 0.25rem;
             font-size: 0.75rem;
@@ -938,7 +945,6 @@
             border-radius: 0.375rem;
             font-size: 0.875rem;
             display: none;
-            /* Hidden by default */
         }
 
         .message-success {
@@ -949,11 +955,8 @@
 
         .message-error {
             background-color: #fee2e2;
-            /* Tailwind: bg-red-100 */
             color: #b91c1c;
-            /* Tailwind: text-red-700 */
             border: 1px solid #fecaca;
-            /* Tailwind: border-red-300 */
         }
     </style>
 </head>
@@ -1060,22 +1063,22 @@
                                 <div id="admin-menu-desktop-dropdown"
                                     class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
                                     <a href="#"
-                                        class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 admin-nav-item"
+                                        class="nav-link block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 admin-nav-item"
                                         data-section="admin-products">Gestionar Productos</a>
                                     <a href="#"
-                                        class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 admin-nav-item"
+                                        class="nav-link block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 admin-nav-item"
                                         data-section="admin-personalize">Personalizar Sitio</a>
                                     <a href="#"
-                                        class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 admin-nav-item"
-                                        data-section="admin-orders">Pedidos</a>
+                                        class="nav-link block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 admin-nav-item"
+                                        data-section="admin-orders">Pedidos <span id="admin-orders-badge-desktop" class="admin-order-notification-badge" style="display:none;"></span></a>
                                     <a href="#"
-                                        class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 admin-nav-item"
+                                        class="nav-link block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 admin-nav-item"
                                         data-section="admin-product-stats">Estadísticas Prod.</a>
                                      <a href="#"
-                                        class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 admin-nav-item"
+                                        class="nav-link block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 admin-nav-item"
                                         data-section="admin-analytics">Analíticas</a>
                                     <a href="#"
-                                        class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 admin-nav-item"
+                                        class="nav-link block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 admin-nav-item"
                                         data-section="admin-customers">Clientes</a>
                                 </div>
                             </div>
@@ -1148,7 +1151,7 @@
                                 data-section="admin-personalize">Personalizar Sitio</a>
                             <a href="#"
                                 class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item"
-                                data-section="admin-orders">Pedidos</a>
+                                data-section="admin-orders">Pedidos <span id="admin-orders-badge-mobile" class="admin-order-notification-badge" style="display:none;"></span></a>
                             <a href="#"
                                 class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item"
                                 data-section="admin-product-stats">Estadísticas Prod.</a>
@@ -1188,11 +1191,9 @@
                         empresa ha crecido de una pequeña tienda local a un referente en calidad y servicio en la
                         región. Nuestro compromiso es ofrecer productos de alta calidad y un servicio excepcional.</p>
                     
-                    <!-- NUEVO CARRUSEL INTEGRADO AQUÍ -->
                     <section id="new-carousel-section" class="max-w-4xl mx-auto my-8 relative">
                         <div id="new-carousel-container" class="relative overflow-hidden rounded-lg shadow-lg bg-white">
                             <div id="new-carousel-slides" class="flex transition-transform duration-700 ease-in-out">
-                                <!-- Slides se insertarán aquí por JavaScript -->
                             </div>
                             <button id="new-prevBtn"
                                 class="absolute top-1/2 left-3 transform -translate-y-1/2 bg-black bg-opacity-30 hover:bg-opacity-60 text-white p-2 rounded-full z-10">
@@ -1204,10 +1205,8 @@
                             </button>
                         </div>
                         <div id="new-carousel-indicators" class="flex justify-center mt-4 space-x-2">
-                            <!-- Indicadores se insertarán aquí por JavaScript -->
                         </div>
                     </section>
-                    <!-- FIN DEL NUEVO CARRUSEL -->
 
                     <section id="categories-section">
                         <h3 class="text-2xl font-semibold text-gray-800 mt-10 mb-6 text-center">Explora por Categoría
@@ -1246,7 +1245,6 @@
                                         class="font-bold">$0</span></p>
                             </div>
                             <div id="payment-button-container" class="mt-4 min-h-[50px] relative">
-                                <!-- Payment options will be injected here by JS -->
                             </div>
                         </div>
                         <div class="text-center mt-6">
@@ -1413,7 +1411,6 @@
                 <!-- SECCIÓN ADMIN (Contenedor General) -->
                 <div id="admin-section-container" style="display: none;" class="mt-8">
                     
-                    <!-- ADMIN - PRODUCTOS -->
                     <div id="admin-products-section" style="display: none;">
                         <h2 class="text-3xl font-semibold text-gray-800 mb-6">Panel de Administración - Productos</h2>
                         <div id="admin-add-edit-product-form-container" style="display: none;" class="mb-8">
@@ -1488,7 +1485,6 @@
                         </div>
                     </div>
 
-                    <!-- ADMIN - PERSONALIZAR SITIO -->
                     <div id="admin-personalize-section" style="display: none;">
                         <h2 class="text-3xl font-semibold text-gray-800 mb-6">Panel de Administración - Personalizar
                             Sitio</h2>
@@ -1556,7 +1552,6 @@
                         </form>
                     </div>
 
-                    <!-- ADMIN - ORDERS -->
                     <div id="admin-orders-section" style="display: none;">
                         <h2 class="text-3xl font-semibold text-gray-800 mb-6">Gestión de Pedidos</h2>
                         <div id="admin-orders-message" class="message mb-4"></div>
@@ -1564,11 +1559,9 @@
                             <p class="p-4 text-center text-gray-500">Cargando pedidos...</p>
                         </div>
                         <div id="admin-order-detail-container" style="display:none;" class="mt-8 p-6 bg-white rounded-lg shadow">
-                            <!-- Los detalles del pedido se mostrarán aquí -->
                         </div>
                     </div>
 
-                    <!-- ADMIN - PRODUCT STATS -->
                     <div id="admin-product-stats-section" style="display: none;">
                         <h2 class="text-3xl font-semibold text-gray-800 mb-6">Estadísticas de Productos</h2>
                         <div id="admin-product-views-message" class="message mb-4"></div>
@@ -1578,7 +1571,6 @@
                         </div>
                     </div>
                     
-                    <!-- ADMIN - ANALYTICS -->
                     <div id="admin-analytics-section" style="display: none;">
                         <h2 class="text-3xl font-semibold text-gray-800 mb-6">Analíticas de Ventas</h2>
                         <div id="admin-analytics-message" class="message mb-4"></div>
@@ -1594,7 +1586,6 @@
                         </div>
                     </div>
 
-                    <!-- ADMIN - CUSTOMERS -->
                      <div id="admin-customers-section" style="display: none;">
                         <h2 class="text-3xl font-semibold text-gray-800 mb-6">Gestión de Clientes</h2>
                         <div id="admin-customers-message" class="message mb-4"></div>
@@ -1603,10 +1594,10 @@
                         </div>
                     </div>
 
-                </div> <!-- Fin de #admin-section-container -->
+                </div> 
             </main>
-        </section> <!-- Fin de #main-content -->
-    </div> <!-- Fin de .flex-grow -->
+        </section> 
+    </div> 
 
     <!-- MODAL DE IMAGEN -->
     <div id="imageModal" class="image-modal" style="display: none;" onclick="closeImageModalOnClick(event)">
@@ -1644,24 +1635,17 @@
             { name: "Jardinería", icon: "fa-solid fa-leaf", id: "jardineria" }
         ];
 
-        // --- REFERENCIAS AL DOM (Agrupadas por sección/funcionalidad) ---
-        // Secciones Principales
+        // --- REFERENCIAS AL DOM ---
         const loginSection = document.getElementById("login-section");
         const registerSection = document.getElementById("register-section");
         const mainContent = document.getElementById("main-content");
         const pageContent = document.getElementById("page-content");
-
-        // Home
         const featuredProductsContainer = document.getElementById("featured-products-container");
         const categoryGridContainer = document.getElementById('category-grid-container');
         const mainWelcomeTitle = document.getElementById('main-welcome-title');
         const mainPromoTitle = document.getElementById('main-promo-title');
         const mainPromoText = document.getElementById('main-promo-text');
-
-        // Productos
         const productsDisplayArea = document.getElementById("products-display-area");
-
-        // Carrito
         const cartSection = document.getElementById('cart-section');
         const cartItemsContainer = document.getElementById('cart-items-container');
         const cartSummaryAndCheckout = document.getElementById('cart-summary-and-checkout');
@@ -1673,9 +1657,6 @@
         const paymentButtonContainer = document.getElementById('payment-button-container'); 
         const cartCheckoutMessage = document.getElementById('payment-result-message'); 
         const cartMessageDiv = document.getElementById('cart-message');
-
-
-        // Contacto
         const contactForm = document.getElementById("contactForm");
         const contactMessageResponseDiv = document.getElementById("contact-message-response");
         const contactSubmitButton = document.getElementById("contactSubmitButton");
@@ -1684,11 +1665,7 @@
         const contactPhoneP = document.getElementById('contact-phone');
         const contactEmailP = document.getElementById('contact-email-info');
         const socialLinksContainer = document.getElementById('social-links-container');
-
-        // FAQ
         const faqAccordion = document.getElementById('faq-accordion');
-
-        // Autenticación y Navegación
         const loginForm = document.getElementById("loginForm");
         const registerForm = document.getElementById("registerForm");
         const logoutButton = document.getElementById("logoutButton");
@@ -1700,15 +1677,11 @@
         const mobileMenu = document.getElementById("mobile-menu");
         const loginMessageDiv = document.getElementById("login-message");
         const registerMessageDiv = document.getElementById("register-message");
-
-        // Administración
         const adminMenuDesktopContainer = document.getElementById('admin-menu-desktop-container');
         const adminMenuDesktopButton = document.getElementById('admin-menu-desktop-button');
         const adminMenuDesktopDropdown = document.getElementById('admin-menu-desktop-dropdown');
         const adminMenuMobileContainer = document.getElementById('admin-menu-mobile-container');
         const adminSectionContainer = document.getElementById('admin-section-container');
-
-        // Admin - Productos
         const adminProductsSection = document.getElementById('admin-products-section');
         const adminProductsTableContainer = document.getElementById('admin-products-table-container');
         const adminProductsMessageDiv = document.getElementById('admin-products-message');
@@ -1722,8 +1695,6 @@
         const adminFormTitle = document.getElementById('admin-form-title');
         const adminProductIdInput = document.getElementById('admin-product-id');
         const adminSaveButton = document.getElementById('admin-save-product-button');
-
-        // Admin - Personalización
         const adminPersonalizeSection = document.getElementById('admin-personalize-section');
         const adminPersonalizeMessageDiv = document.getElementById('admin-personalize-message');
         const colorPrimaryInput = document.getElementById('setting-colorPrimary');
@@ -1742,33 +1713,26 @@
         const socialInstagramInput = document.getElementById('setting-socialInstagram');
         const socialYoutubeInput = document.getElementById('setting-socialYoutube');
         const saveContactSocialButton = document.getElementById('save-contact-social-button');
-
-        // Admin - Product Stats 
         const adminProductStatsSection = document.getElementById('admin-product-stats-section');
         const adminProductViewsContainer = document.getElementById('product-views-container');
         const adminProductViewsMessageDiv = document.getElementById('admin-product-views-message');
-
-        // Admin - Orders 
         const adminOrdersSection = document.getElementById('admin-orders-section');
         const adminOrdersListContainer = document.getElementById('admin-orders-list-container');
         const adminOrderDetailContainer = document.getElementById('admin-order-detail-container');
         const adminOrdersMessageDiv = document.getElementById('admin-orders-message');
-
-        // Admin - Analytics 
         const adminAnalyticsSection = document.getElementById('admin-analytics-section');
         const adminAnalyticsMessageDiv = document.getElementById('admin-analytics-message');
         let dailySalesChartInstance = null;
         let topProductsChartInstance = null;
-        
-        // Admin - Customers 
         const adminCustomersSection = document.getElementById('admin-customers-section');
         const adminCustomersListContainer = document.getElementById('admin-customers-list-container');
         const adminCustomersMessageDiv = document.getElementById('admin-customers-message');
-
-
-        // Modal de Imagen
         const imageModal = document.getElementById('imageModal');
         const modalImage = document.getElementById('modalImage');
+        // Admin order notification badges
+        const adminOrdersBadgeDesktop = document.getElementById('admin-orders-badge-desktop');
+        const adminOrdersBadgeMobile = document.getElementById('admin-orders-badge-mobile');
+
 
         // --- FUNCIONES UTILITARIAS ---
         function showMessage(element, message, isError = true) {
@@ -2000,7 +1964,7 @@
             }
         }
         
-        // --- RENDER CART PAGE (Modified for COD) ---
+        // --- RENDER CART PAGE ---
         function renderCartPage() {
             console.log("[Cart] Rendering page...");
             if (!cartItemsContainer || !cartSummaryAndCheckout || !cartSubtotalSpan || !cartTotalSpan) {
@@ -2189,8 +2153,9 @@
                 if (!response.ok || !result.success) {
                     throw new Error(result.message || `Error ${response.status}`);
                 }
-
-                if(codMessageDiv) showMessage(codMessageDiv, "¡Pedido contra entrega recibido! Nos pondremos en contacto contigo pronto. Tu carrito ha sido vaciado.", false);
+                // Mostrar mensaje de éxito directamente en el contenedor principal de mensajes del carrito
+                // para mayor visibilidad, en lugar de solo en codMessageDiv
+                showMessage(cartMessageDiv || document.getElementById('payment-result-message'), "¡Pedido contra entrega recibido! Nos pondremos en contacto contigo pronto. Tu carrito ha sido vaciado.", false);
                 event.target.reset(); 
                 
                 const codFormContainerEl = document.getElementById('cod-form-container');
@@ -2198,11 +2163,12 @@
                 const codCheckoutBtnElem = document.getElementById('cod-checkout-btn');
 
                 if(codFormContainerEl) codFormContainerEl.style.display = 'none';
-                if(wompiCheckoutBtnElem) wompiCheckoutBtnElem.style.display = 'block'; 
-                if(codCheckoutBtnElem) codCheckoutBtnElem.style.display = 'block'; 
+                // No volver a mostrar los botones de pago aquí, renderCartPage lo hará si es necesario
+                // if(wompiCheckoutBtnElem) wompiCheckoutBtnElem.style.display = 'block'; 
+                // if(codCheckoutBtnElem) codCheckoutBtnElem.style.display = 'block'; 
 
                 saveCart([]);
-                renderCartPage();
+                renderCartPage(); // Esto re-renderizará el carrito vacío y ocultará las opciones de pago
                 updateCartIcon();
 
             } catch (error) {
@@ -2496,7 +2462,7 @@
             }
         }
 
-        // --- ADMIN ORDER MANAGEMENT (Modified for new shipping fields) ---
+        // --- ADMIN ORDER MANAGEMENT ---
         async function loadAndRenderAdminOrders() {
             if (!adminOrdersListContainer) return;
             adminOrdersListContainer.innerHTML = '<p class="p-4 text-center text-gray-500">Cargando pedidos...</p>';
@@ -2594,7 +2560,7 @@
                             <option value="Enviado" ${order.Estado_Pedido === 'Enviado' ? 'selected' : ''}>Enviado</option>
                             <option value="Entregado" ${order.Estado_Pedido === 'Entregado' ? 'selected' : ''}>Entregado</option>
                             <option value="Cancelado" ${order.Estado_Pedido === 'Cancelado' ? 'selected' : ''}>Cancelado</option>
-                            <option value="Pendiente de Confirmacion" ${order.Estado_Pedido === 'Pendiente de Confirmacion' ? 'selected' : ''}>Pendiente de Confirmacion (ContraEntrega)</option>
+                             <option value="Pendiente de Confirmacion" ${order.Estado_Pedido === 'Pendiente de Confirmacion' ? 'selected' : ''}>Pendiente de Confirmacion (ContraEntrega)</option>
                         </select>
                         <button id="update-order-status-btn" data-order-id="${order.ID_Pedido}" class="btn btn-sm btn-primary ml-2">Actualizar Estado</button>
                     </div>
@@ -2649,6 +2615,7 @@
                 showMessage(adminOrdersMessageDiv, 'Estado del pedido actualizado con éxito.', false);
                 const currentStatusEl = document.getElementById('current-order-status');
                 if(currentStatusEl) currentStatusEl.textContent = newStatus;
+                checkNewOrders(); // Actualizar el badge de notificaciones de pedidos
             } catch (error) {
                 console.error(`Error actualizando estado del pedido ${orderId}:`, error);
                 showMessage(adminOrdersMessageDiv, `Error al actualizar estado: ${error.message}`, true);
@@ -2742,6 +2709,55 @@
             }
         }
 
+        // --- ADMIN ORDER NOTIFICATION POLLING ---
+        let lastPendingOrderCount = 0;
+        let orderCheckInterval = null;
+
+        function updateAdminOrderBadges(count) {
+            const badges = [adminOrdersBadgeDesktop, adminOrdersBadgeMobile];
+            badges.forEach(badge => {
+                if (badge) {
+                    if (count > 0) {
+                        badge.textContent = count;
+                        badge.style.display = 'inline-block';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                }
+            });
+        }
+        
+        async function checkNewOrders() {
+            if (!localStorage.getItem("userLoggedIn") || localStorage.getItem("userRole") !== 'admin') {
+                updateAdminOrderBadges(0);
+                return;
+            }
+            try {
+                const response = await fetch(`${API_URL}/api/admin/orders/pending-count`, {
+                    headers: { 'x-admin-simulated': 'true' } 
+                });
+                if (!response.ok) {
+                    console.warn("No se pudo obtener el conteo de pedidos pendientes.");
+                    return;
+                }
+                const data = await response.json();
+                const pendingCount = data.pendingCount || 0;
+                
+                updateAdminOrderBadges(pendingCount);
+
+                if (pendingCount > 0 && pendingCount > lastPendingOrderCount) {
+                    // Aquí podrías añadir un "toast" o notificación más prominente si lo deseas
+                    console.log(`¡Tienes ${pendingCount} nuevos pedidos pendientes!`); 
+                    // Ejemplo de sonido (asegúrate de tener el archivo y manejar permisos del navegador)
+                    // const notificationSound = new Audio('/sounds/new-order-alert.mp3');
+                    // notificationSound.play().catch(e => console.warn("No se pudo reproducir sonido de notificación:", e));
+                }
+                lastPendingOrderCount = pendingCount;
+            } catch (error) {
+                console.error("Error verificando nuevos pedidos:", error);
+            }
+        }
+
 
         // --- FUNCIONES DE NAVEGACIÓN Y UI ---
         async function showPageSection(sectionId, detailId = null) {
@@ -2783,7 +2799,7 @@
                     sectionToShow.style.display = "block";
                     if (sectionId === 'admin-products') { await loadAdminProducts(); showAdminProductList(); } 
                     else if (sectionId === 'admin-personalize') { populatePersonalizeForm(); }
-                    else if (sectionId === 'admin-orders') { await loadAndRenderAdminOrders(); }
+                    else if (sectionId === 'admin-orders') { await loadAndRenderAdminOrders(); checkNewOrders(); /* Refresh badge after viewing */ }
                     else if (sectionId === 'admin-product-stats') { await loadAndRenderProductViews(); }
                     else if (sectionId === 'admin-analytics') { await loadAndRenderAnalytics(); }
                     else if (sectionId === 'admin-customers') { await loadAndRenderAdminCustomers(); }
@@ -2859,17 +2875,35 @@
             }
             if (adminMenuDesktopContainer) adminMenuDesktopContainer.style.display = isAdmin ? 'block' : 'none';
             if (adminMenuMobileContainer) adminMenuMobileContainer.style.display = isAdmin ? 'block' : 'none';
+            
+            // Iniciar/detener polling de pedidos para admin
+            if (isAdmin) {
+                if (!orderCheckInterval) {
+                    checkNewOrders(); 
+                    orderCheckInterval = setInterval(checkNewOrders, 30000); 
+                    console.log("Polling de pedidos iniciado para admin.");
+                }
+            } else {
+                if (orderCheckInterval) {
+                    clearInterval(orderCheckInterval);
+                    orderCheckInterval = null;
+                    updateAdminOrderBadges(0); // Clear badges on logout or if not admin
+                    console.log("Polling de pedidos detenido.");
+                }
+            }
             console.log("UI Updated.");
         }
         async function handleCheckout() { // This is for Wompi
             console.log(">>> [Checkout Wompi COP] Iniciando...");
+            let generalPaymentMessageContainer = document.getElementById('payment-result-message') || cartMessageDiv;
+
             if (!configLoaded) {
-                showMessage(cartCheckoutMessage || document.getElementById('payment-result-message'), 'Error: Configuración de pago no cargada.', true);
+                showMessage(generalPaymentMessageContainer, 'Error: Configuración de pago no cargada.', true);
                 console.error("Checkout Wompi Error: Configuración no cargada.");
                 return;
             }
             if (!wompiPublicKey || !frontendBaseUrl) {
-                showMessage(cartCheckoutMessage || document.getElementById('payment-result-message'), 'Error: Falta configuración de pago.', true);
+                showMessage(generalPaymentMessageContainer, 'Error: Falta configuración de pago.', true);
                 console.error("Checkout Wompi Error: Falta wompiPublicKey o frontendBaseUrl.");
                 return;
             }
@@ -2886,7 +2920,7 @@
             const redirectUrl = `${frontendBaseUrl}/payment-status.html`; 
             
             const wompiCheckoutBtn = document.getElementById('wompi-checkout-btn'); 
-            showMessage(cartCheckoutMessage || document.getElementById('payment-result-message'), 'Preparando checkout seguro con Wompi...', false);
+            showMessage(generalPaymentMessageContainer, 'Preparando checkout seguro con Wompi...', false);
             if (wompiCheckoutBtn) {
                 wompiCheckoutBtn.disabled = true;
                 wompiCheckoutBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Redirigiendo...';
@@ -2910,12 +2944,21 @@
                     if (wompiCheckoutBtn) {
                         wompiCheckoutBtn.disabled = false;
                         wompiCheckoutBtn.innerHTML = 'Pagar con Wompi (Tarjeta, PSE, etc.)'; 
-                        hideMessages(cartCheckoutMessage || document.getElementById('payment-result-message'));
+                        hideMessages(generalPaymentMessageContainer);
+                    }
+                    if (result.transaction && result.transaction.status === 'APPROVED') {
+                        // Mensaje optimista, la confirmación real es via webhook
+                        showMessage(cartMessageDiv || generalPaymentMessageContainer, "¡Pago con Wompi procesado! Estamos confirmando tu pedido.", false);
+                        saveCart([]); 
+                        renderCartPage();
+                        updateCartIcon();
+                    } else if (result.transaction) {
+                        showMessage(generalPaymentMessageContainer, `Estado de la transacción Wompi: ${result.transaction.status}. ${result.transaction.status_message || ''}`, true);
                     }
                 });
             } catch (error) {
                 console.error(">>> [Checkout Wompi COP] Error:", error);
-                showMessage(cartCheckoutMessage || document.getElementById('payment-result-message'), `Error: ${error.message}. Intenta de nuevo.`, true);
+                showMessage(generalPaymentMessageContainer, `Error: ${error.message}. Intenta de nuevo.`, true);
                 if (wompiCheckoutBtn) {
                     wompiCheckoutBtn.disabled = false;
                     wompiCheckoutBtn.innerHTML = 'Pagar con Wompi (Tarjeta, PSE, etc.)'; 
@@ -3488,3 +3531,4 @@
     </script>
 </body>
 </html>
+```
