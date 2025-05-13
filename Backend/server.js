@@ -3,6 +3,7 @@
 // Añadido SSL para conexión a TiDB Cloud
 // *** Añadido soporte para 5 imágenes de producto y nuevas funcionalidades de admin ***
 // *** Actualizado para manejar campos de dirección detallados en Pago Contra Entrega ***
+// *** Añadido endpoint para conteo de pedidos pendientes para notificaciones admin ***
 
 // --- DEPENDENCIAS ---
 const express = require('express');
@@ -34,7 +35,7 @@ console.log(`--> URL Frontend para Redirección: ${FRONTEND_URL || 'NO DEFINIDA'
 console.log(`--> Entorno Node.js: ${process.env.NODE_ENV || 'development (default)'}`);
 
 // --- CONFIGURACIÓN DEL SITIO DESDE BASE DE DATOS ---
-let siteSettings = {}; // Inicializar como objeto vacío
+let siteSettings = {}; 
 
 async function loadSiteSettingsFromDB() {
     console.log("--> Cargando siteSettings desde la base de datos...");
@@ -74,7 +75,7 @@ async function loadSiteSettingsFromDB() {
 
     } catch (error) {
         console.error("!!! Error CRÍTICO al cargar siteSettings desde la DB. Usando defaults en memoria:", error);
-        siteSettings = { // Fallback a defaults en memoria
+        siteSettings = { 
             colorPrimary: '#ea580c', colorSecondary: '#047857', colorAccent: '#f1f5f9',
             welcomeTitle: 'Bienvenido a Ferremax', promoBannerTitle: '¡Ofertas Imperdibles de Temporada!',
             promoBannerText: 'Encuentra descuentos especiales en herramientas seleccionadas. ¡No te lo pierdas!',
@@ -94,7 +95,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// --- CONEXIÓN BASE DE DATOS (Con SSL para TiDB Cloud) ---
+// --- CONEXIÓN BASE DE DATOS ---
 let dbPool;
 
 async function initializeApp() {
@@ -276,7 +277,7 @@ app.get('/api/categories', async (req, res) => {
 app.post('/api/contact', async (req, res) => {
     console.log("--> POST /api/contact");
     try {
-        const { name, email, subject, message } = req.body; // subject is received but not used in INSERT
+        const { name, email, subject, message } = req.body; 
         if (!name || !email || !message) {
             console.warn("\tMensaje de contacto: Faltan datos requeridos.");
             return res.status(400).json({ success: false, message: "Nombre, email y mensaje son requeridos." });
@@ -404,16 +405,19 @@ app.post('/api/wompi/webhook', async (req, res) => {
                 const emailClienteEnvio = eventData.customer_email || tempOrderData?.customerData?.email || 'N/A';
                 const telefonoClienteEnvio = tempOrderData?.customerData?.phoneNumber || 'N/A';
                 const direccionEnvio = `${eventData.shipping_address?.address_line_1 || ''} ${eventData.shipping_address?.city || ''}`.trim() || tempOrderData?.customerData?.address || 'N/A';
+                const departamentoEnvio = eventData.shipping_address?.region || tempOrderData?.customerData?.department || null;
+                const ciudadEnvio = eventData.shipping_address?.city || tempOrderData?.customerData?.city || null;
+                const puntoReferenciaEnvio = eventData.shipping_address?.address_line_2 || tempOrderData?.customerData?.referencePoint || null;
 
 
                 const [pedidoResult] = await connection.query(
-                    `INSERT INTO pedidos (ID_Usuario, Total_Pedido, Estado_Pedido, Metodo_Pago, Referencia_Pago, Nombre_Cliente_Envio, Email_Cliente_Envio, Telefono_Cliente_Envio, Direccion_Envio, Departamento_Envio, Ciudad_Envio, Punto_Referencia_Envio, Fecha_Pedido)
+                    `INSERT INTO pedidos (ID_Usuario, Total_Pedido, Estado_Pedido, Metodo_Pago, Referencia_Pago, 
+                                       Nombre_Cliente_Envio, Email_Cliente_Envio, Telefono_Cliente_Envio, Direccion_Envio, 
+                                       Departamento_Envio, Ciudad_Envio, Punto_Referencia_Envio, Fecha_Pedido)
                      VALUES (?, ?, 'Pagado', 'Wompi', ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
                     [userId, orderDetails.total, transactionReference, 
                      nombreClienteEnvio, emailClienteEnvio, telefonoClienteEnvio, direccionEnvio, 
-                     eventData.shipping_address?.region || null, // Asumiendo region como departamento
-                     eventData.shipping_address?.city || null,
-                     eventData.shipping_address?.address_line_2 || null // Asumiendo address_line_2 como referencia
+                     departamentoEnvio, ciudadEnvio, puntoReferenciaEnvio
                     ]
                 );
                 const pedidoId = pedidoResult.insertId;
@@ -456,7 +460,6 @@ app.post('/api/orders/cash-on-delivery', async (req, res) => {
     console.log("--> POST /api/orders/cash-on-delivery");
     const { cart, customerInfo } = req.body;
 
-    // Validación actualizada para incluir departamento y ciudad
     if (!cart || cart.length === 0 || !customerInfo ||
         !customerInfo.name || !customerInfo.phone || !customerInfo.address ||
         !customerInfo.department || !customerInfo.city || 
@@ -728,7 +731,7 @@ app.get('/api/admin/orders/:id', checkAdmin, async (req, res) => {
     console.log(`--> GET /api/admin/orders/${pedidoId}`);
     if (isNaN(pedidoId)) return res.status(400).json({ success: false, message: "ID de pedido inválido." });
     try {
-        const [pedidoInfo] = await dbPool.query( // Query is already p.*
+        const [pedidoInfo] = await dbPool.query( 
             `SELECT p.*, COALESCE(u.username, p.Nombre_Cliente_Envio) as Cliente_Nombre, COALESCE(u.email, p.Email_Cliente_Envio) as Cliente_Email
              FROM pedidos p
              LEFT JOIN usuarios u ON p.ID_Usuario = u.id
@@ -765,6 +768,24 @@ app.put('/api/admin/orders/:id/status', checkAdmin, async (req, res) => {
         res.status(500).json({ success: false, message: "Error al actualizar el estado del pedido." });
     }
 });
+
+// NUEVO: Endpoint para conteo de pedidos pendientes (admin)
+app.get('/api/admin/orders/pending-count', checkAdmin, async (req, res) => {
+    console.log("--> GET /api/admin/orders/pending-count");
+    try {
+        const [rows] = await dbPool.query(
+            "SELECT COUNT(*) as pendingCount FROM pedidos WHERE Estado_Pedido IN ('Pendiente de Confirmacion', 'Pagado')"
+            // Podrías añadir: AND visto_por_admin = 0 (si implementas esa columna)
+        );
+        const pendingCount = rows[0]?.pendingCount || 0;
+        console.log(`\t<-- Pedidos pendientes: ${pendingCount}`);
+        res.status(200).json({ success: true, pendingCount });
+    } catch (error) {
+        console.error("!!! Error GET /api/admin/orders/pending-count:", error);
+        res.status(500).json({ success: false, message: "Error al obtener conteo de pedidos pendientes." });
+    }
+});
+
 
 // ANALÍTICAS
 app.get('/api/admin/analytics/sales-overview', checkAdmin, async (req, res) => {
