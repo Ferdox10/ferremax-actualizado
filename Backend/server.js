@@ -139,6 +139,85 @@ const checkAdmin = (req, res, next) => {
     }
 };
 
+// --- MIDDLEWARE DE AUTENTICACIÓN DE USUARIO REGISTRADO (para historial de compras) ---
+const checkUser = async (req, res, next) => {
+    // Para simulación, esperamos un header x-user-id.
+    // En producción, esto se haría con tokens JWT o sesiones.
+    const userId = req.headers['x-user-id'];
+    if (!userId || isNaN(parseInt(userId))) {
+        console.warn(`\t[User Check] Acceso DENEGADO a ruta de usuario: Falta o es inválido x-user-id.`);
+        return res.status(401).json({ success: false, message: 'Autenticación requerida. Por favor, inicia sesión.' });
+    }
+    try {
+        // Opcional: Verificar si el usuario existe en la BD
+        const [users] = await dbPool.query('SELECT id FROM usuarios WHERE id = ?', [userId]);
+        if (users.length === 0) {
+            console.warn(`\t[User Check] Usuario con ID ${userId} no encontrado en la BD.`);
+            return res.status(401).json({ success: false, message: 'Usuario no válido.' });
+        }
+        req.userId = parseInt(userId); // Añadir userId al objeto request para uso en la ruta
+        next();
+    } catch (error) {
+        console.error('!!! Error en middleware checkUser:', error);
+        return res.status(500).json({ success: false, message: 'Error de autenticación.' });
+    }
+};
+
+
+// --- RUTAS ---
+// ... (rutas existentes: /api/config, /register, /login, /api/productos, etc.) ...
+
+// --- NUEVA RUTA PARA HISTORIAL DE COMPRAS DEL USUARIO ---
+app.get('/api/user/orders', checkUser, async (req, res) => {
+    const userId = req.userId; // Obtenido del middleware checkUser
+    console.log(`--> GET /api/user/orders para Usuario ID: ${userId}`);
+
+    try {
+        // 1. Obtener los pedidos del usuario
+        const [pedidos] = await dbPool.query(
+            `SELECT ID_Pedido, Fecha_Pedido, Total_Pedido, Estado_Pedido, Metodo_Pago, Referencia_Pago 
+             FROM pedidos 
+             WHERE ID_Usuario = ? 
+             ORDER BY Fecha_Pedido DESC`,
+            [userId]
+        );
+
+        if (pedidos.length === 0) {
+            console.log(`\t<-- No se encontraron pedidos para el Usuario ID: ${userId}`);
+            return res.status(200).json({ success: true, orders: [] });
+        }
+
+        // 2. Para cada pedido, obtener sus detalles y la información de los productos
+        const ordersWithDetails = await Promise.all(
+            pedidos.map(async (pedido) => {
+                const [detalles] = await dbPool.query(
+                    `SELECT dp.Cantidad, dp.Precio_Unitario_Compra, 
+                            p.Nombre as ProductName, p.imagen_url as ProductImageUrl, p.ID_Producto
+                     FROM detalles_pedido dp
+                     JOIN producto p ON dp.ID_Producto = p.ID_Producto
+                     WHERE dp.ID_Pedido = ?`,
+                    [pedido.ID_Pedido]
+                );
+                return {
+                    ...pedido,
+                    items: detalles.map(d => ({
+                        productId: d.ID_Producto,
+                        name: d.ProductName,
+                        quantity: d.Cantidad,
+                        pricePaid: d.Precio_Unitario_Compra,
+                        imageUrl: d.ProductImageUrl
+                    }))
+                };
+            })
+        );
+        console.log(`\t<-- Devolviendo ${ordersWithDetails.length} pedidos con detalles para Usuario ID: ${userId}`);
+        res.status(200).json({ success: true, orders: ordersWithDetails });
+
+    } catch (error) {
+        console.error(`!!! Error GET /api/user/orders para Usuario ID ${userId}:`, error);
+        res.status(500).json({ success: false, message: 'Error al obtener el historial de compras.' });
+    }
+});
 
 // ------------------------------------------------------
 // --- RUTAS ---

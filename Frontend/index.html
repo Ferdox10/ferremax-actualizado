@@ -99,6 +99,11 @@
                                 data-section="home">Inicio</a>
                             <a href="#" class="nav-link px-3 py-2 rounded-md text-sm font-medium admin-nav-item"
                                 data-section="products">Productos</a>
+                            
+                            <!-- NUEVO: Enlace a Mis Compras (solo para usuarios no admin) -->
+                            <a href="#" id="nav-link-purchase-history-desktop" class="nav-link px-3 py-2 rounded-md text-sm font-medium admin-nav-item"
+                                data-section="purchase-history" style="display: none;">Mis Compras</a>
+                            
                             <a href="#"
                                 class="nav-link px-3 py-2 rounded-md text-sm font-medium admin-nav-item cart-icon-container relative"
                                 data-section="cart" title="Ver Carrito">
@@ -180,6 +185,12 @@
                         <a href="#"
                             class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item"
                             data-section="products">Productos</a>
+                        
+                        <!-- NUEVO: Enlace a Mis Compras Móvil (solo para usuarios no admin) -->
+                        <a href="#" id="nav-link-purchase-history-mobile"
+                            class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item"
+                            data-section="purchase-history" style="display: none;">Mis Compras</a>
+
                         <a href="#"
                             class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item"
                             data-section="cart">
@@ -307,7 +318,9 @@
                             <div id="payment-button-container" class="mt-4 min-h-[50px] relative">
                                 <!-- Botones de pago se insertarán aquí por JS -->
                             </div>
-                            <div id="payment-result-message" class="message mt-2 text-center"></div>
+                            <div id="payment-result-message-container"> 
+                                <p id="payment-result-message" class="message mt-2 text-center"></p> 
+                            </div>
 
                         </div>
                         <div class="text-center mt-6">
@@ -470,6 +483,16 @@
                         </div>
                     </div>
                 </div>
+                
+                <!-- NUEVA SECCIÓN HISTORIAL DE COMPRAS -->
+                <section id="purchase-history-section" style="display: none;">
+                    <h2 class="text-3xl font-semibold text-gray-800 mb-6 text-center">Tu Historial de Compras</h2>
+                    <div id="purchase-history-message" class="message mb-4"></div>
+                    <div id="history-list-container" class="space-y-6">
+                        <!-- El historial de compras se renderizará aquí por JavaScript -->
+                        <p class="text-center text-gray-500 p-4">Cargando historial...</p>
+                    </div>
+                </section>
 
                 <!-- SECCIÓN ADMIN (Contenedor General) -->
                 <div id="admin-section-container" style="display: none;" class="mt-8">
