@@ -126,7 +126,6 @@ const orderHistoryListContainer = document.getElementById('order-history-list-co
 const orderDetailViewContainer = document.getElementById('order-detail-view-container');
 
 // --- FUNCIONES UTILITARIAS ---
-// ... (Incluye aquí las funciones showMessage, hideMessages, darkenColor, formatCOP)
 function showMessage(element, message, isError = true) {
     if (!element) { console.warn("showMessage: Elemento nulo para mensaje:", message); return; }
     element.textContent = message;
@@ -184,9 +183,7 @@ function formatCOP(value) {
     return formatter.format(value);
 }
 
-
 // --- FUNCIONES DEL CARRITO ---
-// ... (Incluye aquí las funciones getCart, saveCart, addToCart, removeFromCart, updateCartQuantity, calculateCartTotals, updateCartIcon)
 function getCart() {
     const cartJson = localStorage.getItem(CART_STORAGE_KEY);
     try {
@@ -362,31 +359,677 @@ function updateCartIcon() {
 }
 
 // --- LOG PRODUCT VIEW ---
-async function logProductView(productId) { /* ... (código completo) ... */ }
+async function logProductView(productId) {
+    try {
+        await fetch(`${API_URL}/api/products/${productId}/view`, { method: 'POST' });
+    } catch (error) {
+        console.warn(`Error al registrar vista para producto ID ${productId}:`, error);
+    }
+}
         
 // --- RENDER CART PAGE ---
-function renderCartPage() { /* ... (código completo) ... */ }
-async function handleCheckout() { /* ... (código completo) ... */ }
-async function handleCashOnDeliverySubmit(event) { /* ... (código completo) ... */ }
+function renderCartPage() {
+    console.log("[Cart] Rendering page...");
+    if (!cartItemsContainer || !cartSummaryAndCheckout || !cartSubtotalSpan || !cartTotalSpan) {
+        console.error("Cart Render: Missing DOM elements");
+        if(pageContent) pageContent.innerHTML = '<p class="text-red-600 text-center p-4">Error interno al mostrar el carrito.</p>';
+        return;
+    }
+
+    const cart = getCart();
+    cartItemsContainer.innerHTML = ""; 
+
+    if (cart.length === 0) {
+        cartItemsContainer.innerHTML = '<p class="text-center text-gray-500 py-4">Tu carrito está vacío.</p>';
+        cartSummaryAndCheckout.style.display = 'none';
+        if (paymentButtonContainer) paymentButtonContainer.innerHTML = '';
+    } else {
+        const { subtotal, total } = calculateCartTotals();
+        cart.forEach(item => {
+            if (!item || typeof item.productId === 'undefined' || item.productId === null) {
+                console.warn("[Cart Render] Ignorando item inválido:", item); return;
+            }
+            const imageUrl = item.imageUrl || `https://placehold.co/60x60/e5e7eb/4b5563?text=NI`;
+            const imageOnError = `this.onerror=null;this.src='https://placehold.co/60x59/fecaca/b91c1c?text=Err';this.alt='Imagen no disponible';`;
+            const priceF = formatCOP(item.price);
+            const itemTotalF = formatCOP((parseFloat(item.price) || 0) * (parseInt(item.quantity) || 0));
+            const stock = item.stock || 0;
+
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'cart-item flex items-center justify-between border-b py-4 last:border-b-0 flex-wrap gap-2';
+            itemDiv.innerHTML = `
+                <div class="flex items-center flex-grow min-w-[200px]">
+                    <img src="${imageUrl}" alt="${item.name || 'Producto'}" onerror="${imageOnError}" class="w-16 h-16 object-contain mr-4 border rounded">
+                    <div>
+                        <h4 class="font-semibold text-gray-800">${item.name || 'N/A'}</h4>
+                        <p class="text-sm text-gray-600">Precio: ${priceF}</p>
+                        <p class="text-xs text-gray-500 mt-1">Stock: ${stock}</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2 sm:space-x-3">
+                    <label for="qty-${item.productId}" class="sr-only">Cantidad</label>
+                    <input type="number" id="qty-${item.productId}" value="${item.quantity}" min="0" max="${stock}" data-product-id-qty="${item.productId}" class="border rounded px-1 py-1 w-14 sm:w-16 text-center cart-item-qty-input" aria-label="Cantidad">
+                    <p class="font-semibold w-20 text-right">${itemTotalF}</p>
+                    <button class="remove-item-btn cart-item-remove-button" data-product-id-remove="${item.productId}" title="Eliminar">
+                        <i class="fas fa-trash-alt pointer-events-none"></i>
+                    </button>
+                </div>`;
+            cartItemsContainer.appendChild(itemDiv);
+        });
+
+        cartSubtotalSpan.textContent = formatCOP(subtotal);
+        cartTotalSpan.textContent = formatCOP(total);
+        cartSummaryAndCheckout.style.display = 'block';
+
+        const paymentOptionsDiv = document.createElement('div');
+        paymentOptionsDiv.className = 'mt-6 border-t pt-6';
+        paymentOptionsDiv.innerHTML = `
+            <h4 class="text-lg font-semibold mb-3">Selecciona tu método de pago:</h4>
+            <div class="space-y-3">
+                <button id="wompi-checkout-btn" class="btn btn-primary btn-full">Pagar con Wompi (Tarjeta, PSE, etc.)</button>
+                <button id="cod-checkout-btn" class="btn btn-secondary btn-full">Pago Contra Entrega</button>
+            </div>
+            <div id="cod-form-container" style="display:none;" class="mt-4 p-4 border rounded bg-gray-50">
+                <h5 class="font-semibold mb-2">Datos para Pago Contra Entrega:</h5>
+                <form id="cod-form" class="space-y-3">
+                    <div><label for="cod-name">Nombre Completo*</label><input type="text" id="cod-name" name="cod-name" required></div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div><label for="cod-department">Departamento*</label><input type="text" id="cod-department" name="cod-department" required></div>
+                        <div><label for="cod-city">Ciudad*</label><input type="text" id="cod-city" name="cod-city" required></div>
+                    </div>
+                    <div><label for="cod-address">Dirección Completa (Calle, Número, Barrio)*</label><textarea id="cod-address" name="cod-address" rows="2" required></textarea></div>
+                    <div><label for="cod-reference-point">Punto de Referencia (Opcional)</label><textarea id="cod-reference-point" name="cod-reference-point" rows="2"></textarea></div>
+                    <div><label for="cod-phone">Teléfono*</label><input type="tel" id="cod-phone" name="cod-phone" required></div>
+                    <div><label for="cod-email">Correo Electrónico*</label><input type="email" id="cod-email" name="cod-email" required></div>
+                    <button type="submit" class="btn btn-success btn-full">Confirmar Pedido Contra Entrega</button>
+                </form>
+                <div id="cod-message" class="message mt-3"></div>
+            </div>
+            <div id="payment-result-message-container" class="mt-4">
+                 <p id="payment-result-message" class="message text-center"></p>
+            </div>`;
+        
+        if (paymentButtonContainer) {
+            paymentButtonContainer.innerHTML = '';
+            paymentButtonContainer.appendChild(paymentOptionsDiv);
+        } else {
+            console.error("paymentButtonContainer no encontrado en el DOM");
+            if (cartSummaryAndCheckout) cartSummaryAndCheckout.appendChild(paymentOptionsDiv);
+        }
+
+        document.getElementById('wompi-checkout-btn')?.addEventListener('click', handleCheckout);
+        
+        const codCheckoutBtn = document.getElementById('cod-checkout-btn');
+        const codFormContainer = document.getElementById('cod-form-container');
+        const codForm = document.getElementById('cod-form');
+
+        codCheckoutBtn?.addEventListener('click', () => {
+            if (codFormContainer) codFormContainer.style.display = 'block';
+            if (codCheckoutBtn) codCheckoutBtn.style.display = 'none';
+            const wompiBtn = document.getElementById('wompi-checkout-btn');
+            if (wompiBtn) wompiBtn.style.display = 'none';
+
+            const loggedInEmail = localStorage.getItem('userEmail');
+            const codEmailField = document.getElementById('cod-email');
+            if (loggedInEmail && codEmailField) {
+                codEmailField.value = loggedInEmail;
+            }
+        });
+        codForm?.addEventListener('submit', handleCashOnDeliverySubmit);
+    }
+    hideMessages(cartMessageDiv);
+    const paymentResultMessageEl = document.getElementById('payment-result-message');
+    if(paymentResultMessageEl) hideMessages(paymentResultMessageEl);
+}
+
+async function handleCheckout() {
+    console.log(">>> [Checkout Wompi COP] Iniciando...");
+    let generalPaymentMessageContainer = document.getElementById('payment-result-message') || cartMessageDiv;
+
+    if (!configLoaded) {
+        showMessage(generalPaymentMessageContainer, 'Error: Configuración de pago no cargada.', true);
+        console.error("Checkout Wompi Error: Configuración no cargada.");
+        return;
+    }
+    if (!wompiPublicKey || !frontendBaseUrl) {
+        showMessage(generalPaymentMessageContainer, 'Error: Falta configuración de pago.', true);
+        console.error("Checkout Wompi Error: Falta wompiPublicKey o frontendBaseUrl.");
+        return;
+    }
+
+    const cart = getCart();
+    if (cart.length === 0) {
+        showMessage(cartMessageDiv, 'Tu carrito está vacío. Añade productos antes de proceder al pago.', true);
+        return;
+    }
+
+    const { total } = calculateCartTotals();
+    console.log(`[Checkout Wompi COP] Total calculado (debe ser COP): ${total}`);
+    const reference = `ferremax_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const currency = 'COP';
+    const totalInCents = Math.round(total * 100);
+    const redirectUrl = `${frontendBaseUrl}/payment-status.html`; 
+
+    const wompiCheckoutBtn = document.getElementById('wompi-checkout-btn');
+    showMessage(generalPaymentMessageContainer, 'Preparando checkout seguro con Wompi...', false);
+    if (wompiCheckoutBtn) {
+        wompiCheckoutBtn.disabled = true;
+        wompiCheckoutBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Redirigiendo...';
+    }
+
+    try {
+        const cartDataForBackend = cart.map(item => ({ productId: item.productId, quantity: item.quantity, price: item.price }));
+        const tempResponse = await fetch(`${API_URL}/api/wompi/temp-order`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reference: reference, items: cartDataForBackend, total: total, userId: localStorage.getItem('userId'), customerData: { email: localStorage.getItem('userEmail') } })
+        });
+        const tempData = await tempResponse.json();
+        if (!tempResponse.ok || !tempData.success) {
+            throw new Error(tempData.message || 'Error guardando orden temporal en backend.');
+        }
+
+        const checkout = new WidgetCheckout({
+            currency: currency,
+            amountInCents: totalInCents,
+            reference: reference,
+            publicKey: wompiPublicKey,
+            redirectUrl: redirectUrl,
+        });
+
+        checkout.open(function (result) {
+            console.log(">>> [Checkout Wompi COP] Widget cerrado o redirigido. Resultado:", result);
+            if (wompiCheckoutBtn) {
+                wompiCheckoutBtn.disabled = false;
+                wompiCheckoutBtn.innerHTML = 'Pagar con Wompi (Tarjeta, PSE, etc.)';
+            }
+            hideMessages(generalPaymentMessageContainer);
+
+            if (result.transaction && result.transaction.status === 'APPROVED') {
+                showMessage(cartMessageDiv || generalPaymentMessageContainer, "¡Pago con Wompi procesado! Estamos confirmando tu pedido.", false);
+                saveCart([]);
+                renderCartPage(); 
+                updateCartIcon();
+            } else if (result.transaction) {
+                showMessage(generalPaymentMessageContainer, `Estado de la transacción Wompi: ${result.transaction.status}. ${result.transaction.status_message || ''}`, true);
+            } else if (result.error) {
+                 showMessage(generalPaymentMessageContainer, `Error con Wompi: ${result.error.type} - ${result.error.reason || ''}`, true);
+            }
+        });
+    } catch (error) {
+        console.error(">>> [Checkout Wompi COP] Error:", error);
+        showMessage(generalPaymentMessageContainer, `Error: ${error.message}. Intenta de nuevo.`, true);
+        if (wompiCheckoutBtn) {
+            wompiCheckoutBtn.disabled = false;
+            wompiCheckoutBtn.innerHTML = 'Pagar con Wompi (Tarjeta, PSE, etc.)';
+        }
+    }
+}
+
+async function handleCashOnDeliverySubmit(event) {
+    event.preventDefault();
+    const codMessageEl = document.getElementById('cod-message');
+    if (codMessageEl) hideMessages(codMessageEl);
+
+    const customerInfo = {
+        name: document.getElementById('cod-name')?.value.trim(),
+        department: document.getElementById('cod-department')?.value.trim(),
+        city: document.getElementById('cod-city')?.value.trim(),
+        address: document.getElementById('cod-address')?.value.trim(),
+        referencePoint: document.getElementById('cod-reference-point')?.value.trim() || null,
+        phone: document.getElementById('cod-phone')?.value.trim(),
+        email: document.getElementById('cod-email')?.value.trim(),
+        userId: localStorage.getItem('userId') || null
+    };
+
+    if (!customerInfo.name || !customerInfo.phone || !customerInfo.address ||
+        !customerInfo.department || !customerInfo.city || !customerInfo.email) {
+        if (codMessageEl) showMessage(codMessageEl, "Por favor, completa todos los datos requeridos (*) para el envío.", true);
+        return;
+    }
+
+    const cartForBackend = getCart().map(item => ({
+        productId: item.productId,
+        quantity: item.quantity,
+        price: item.price, 
+        name: item.name
+    }));
+
+    if (cartForBackend.length === 0) {
+        if (codMessageEl) showMessage(codMessageEl, "Tu carrito está vacío.", true);
+        return;
+    }
+
+    const submitButton = event.target.querySelector('button[type="submit"]');
+    if (submitButton) { submitButton.disabled = true; submitButton.textContent = 'Procesando...'; }
+
+    try {
+        const response = await fetch(`${API_URL}/api/orders/cash-on-delivery`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cart: cartForBackend, customerInfo })
+        });
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            throw new Error(result.message || `Error ${response.status}`);
+        }
+        
+        showMessage(cartMessageDiv || document.getElementById('payment-result-message'), "¡Pedido contra entrega recibido! Nos pondremos en contacto contigo pronto. Tu carrito ha sido vaciado.", false);
+        
+        const codFormEl = document.getElementById('cod-form');
+        if(codFormEl) codFormEl.reset();
+        const codFormContainerEl = document.getElementById('cod-form-container');
+        if(codFormContainerEl) codFormContainerEl.style.display = 'none';
+        
+        saveCart([]); 
+        renderCartPage(); 
+        updateCartIcon();
+
+    } catch (error) {
+        console.error("Error al enviar pedido contra entrega:", error);
+        if (codMessageEl) showMessage(codMessageEl, `Error al procesar tu pedido: ${error.message}`, true);
+    } finally {
+        if (submitButton) { submitButton.disabled = false; submitButton.textContent = 'Confirmar Pedido Contra Entrega'; }
+    }
+}
 
 // --- FUNCIONES DE RENDERIZADO (PRODUCTOS, CATEGORÍAS, ETC.) ---
-function renderProductCard(product) { /* ... (código completo) ... */ }
-function renderProductGrid(container) { /* ... (código completo) ... */ }
-function renderFeaturedProducts(container) { /* ... (código completo) ... */ }
-function renderProductDetailContent(container, product) { /* ... (código completo) ... */ }
-function renderProductDetail(container, productId) { /* ... (código completo) ... */ }
-function renderCategories() { /* ... (código completo) ... */ }
+function renderProductCard(product) {
+    const div = document.createElement("div");
+    div.className = `product-card`; 
+    const imageUrl = product.imagen_url || `https://placehold.co/300x200/e5e7eb/4b5563?text=NI`;
+    const imageOnError = `this.onerror=null;this.src='https://placehold.co/300x199/fecaca/b91c1c?text=Err';this.alt='Imagen no disponible';`;
+    const price = formatCOP(product.precio_unitario);
+    const stock = product.cantidad ?? 0;
+    const isOutOfStock = stock <= 0;
+
+    div.innerHTML = `
+        <div class="card-img-container product-detail-link cursor-pointer" data-product-id-detail="${product.ID_Producto}">
+            <img src="${imageUrl}" class="card-img-top" alt="${product.Nombre || 'Producto'}" onerror="${imageOnError}">
+        </div>
+        <div class="p-4 flex flex-col flex-grow">
+            <h5 class="text-lg font-semibold text-gray-800 truncate mb-1 product-detail-link cursor-pointer" title="${product.Nombre || ''}" data-product-id-detail="${product.ID_Producto}">${product.Nombre || 'N/A'}</h5>
+            <p class="text-sm text-gray-500 mb-2 truncate">${product.Descripcion || 'Descripción no disponible'}</p>
+            <p class="text-xl font-bold product-price mt-auto mb-3">${price}</p>
+            <button class="add-to-cart-button mt-auto w-full btn ${isOutOfStock ? 'btn-gray cursor-not-allowed' : 'btn-primary'}" data-product-id-add="${product.ID_Producto}" ${isOutOfStock ? 'disabled title="Sin stock"' : ''}>
+                ${isOutOfStock ? '<i class="fas fa-times-circle mr-2"></i>Sin Stock' : '<i class="fas fa-cart-plus mr-2"></i>Añadir al Carrito'}
+            </button>
+        </div>`;
+    return div;
+}
+
+function renderProductGrid(container) {
+    if (!container) { console.warn("Contenedor de productos no encontrado para renderProductGrid"); return; }
+    container.innerHTML = "";
+    if (!allProducts || allProducts.length === 0) {
+        container.innerHTML = '<p class="col-span-full text-center text-gray-500 p-4">No hay productos disponibles.</p>';
+        return;
+    }
+    allProducts.forEach(p => container.appendChild(renderProductCard(p)));
+}
+
+function renderFeaturedProducts(container) {
+    if (!container) { console.warn("Contenedor de productos destacados no encontrado"); return; }
+    container.innerHTML = "";
+    if (!allProducts || allProducts.length === 0) {
+        container.innerHTML = '<p class="col-span-full text-center text-gray-500 p-4">No hay productos destacados.</p>';
+        return;
+    }
+    const featured = allProducts.slice(0, 3);
+    featured.forEach(p => container.appendChild(renderProductCard(p)));
+}
+
+function renderProductDetailContent(container, product) {
+    if (!container) { console.warn("Contenedor de detalle de producto no encontrado"); return; }
+    container.innerHTML = "";
+    const detailDiv = document.createElement("div");
+    detailDiv.className = "product-detail-container";
+
+    const imageURLs = [product.imagen_url, product.imagen_url_2, product.imagen_url_3, product.imagen_url_4, product.imagen_url_5].filter(url => url);
+    const mainImageUrl = imageURLs.length > 0 ? imageURLs[0] : `https://placehold.co/600x400/e5e7eb/4b5563?text=NI`;
+    const imageOnError = `this.onerror=null;this.src='https://placehold.co/600x399/fecaca/b91c1c?text=Err';this.alt='Imagen no disponible';`;
+    const price = formatCOP(product.precio_unitario);
+    const stock = product.cantidad ?? 0;
+    const isOutOfStock = stock <= 0;
+
+    let thumbnailsHTML = '';
+    if (imageURLs.length > 1) {
+        thumbnailsHTML = imageURLs.map((url, index) => `
+            <img src="${url}" alt="Miniatura ${index + 1}" class="thumbnail-img ${index === 0 ? 'active' : ''}" onclick="changeMainImage('${url}', this)">
+        `).join('');
+    }
+
+    detailDiv.innerHTML = `
+        <div class="product-detail-image-container">
+            <div class="main-image-wrapper">
+                <img id="mainProductImage" src="${mainImageUrl}" class="product-detail-image" alt="${product.Nombre || 'Producto'}" onerror="${imageOnError}" title="Haz clic para ampliar">
+            </div>
+            ${imageURLs.length > 1 ? `<div class="thumbnail-container">${thumbnailsHTML}</div>` : ''}
+        </div>
+        <div class="product-detail-info">
+            <h3 class="text-2xl lg:text-3xl font-bold text-gray-800 mb-3">${product.Nombre || 'N/A'}</h3>
+            <button id="toggleDescriptionBtn" class="text-sm link-primary mb-3">Ver Descripción</button>
+            <p id="productDescriptionText" class="product-description-text">${product.Descripcion || 'Descripción no disponible.'}</p>
+            <p class="text-sm text-gray-500 mb-2 mt-4">Disponibles: ${stock}</p>
+            <p class="text-3xl font-bold product-price mb-6">${price}</p>
+            <button class="add-to-cart-button w-full sm:w-auto btn ${isOutOfStock ? 'btn-gray cursor-not-allowed' : 'btn-primary'} mb-4" data-product-id-add="${product.ID_Producto}" ${isOutOfStock ? 'disabled title="Sin stock"' : ''}>
+                ${isOutOfStock ? '<i class="fas fa-times-circle mr-2"></i>Sin Stock' : '<i class="fas fa-cart-plus mr-2"></i>Añadir al Carrito'}
+            </button>
+            <button id="back-to-products" class="mt-6 w-full sm:w-auto btn btn-gray">
+                <i class="fas fa-arrow-left mr-2"></i>Volver a Productos
+            </button>
+        </div>`;
+    container.appendChild(detailDiv);
+
+    const backBtn = detailDiv.querySelector("#back-to-products");
+    if (backBtn) backBtn.addEventListener("click", () => showPageSection("products"));
+
+    const mainImageEl = detailDiv.querySelector("#mainProductImage");
+    if (mainImageEl) mainImageEl.addEventListener('click', () => openImageModal(mainImageEl.src));
+
+    const toggleBtn = detailDiv.querySelector("#toggleDescriptionBtn");
+    const descriptionText = detailDiv.querySelector("#productDescriptionText");
+    if (toggleBtn && descriptionText) {
+        toggleBtn.addEventListener('click', () => {
+            const isHidden = descriptionText.style.display === 'none' || descriptionText.style.display === '';
+            descriptionText.style.display = isHidden ? 'block' : 'none';
+            toggleBtn.textContent = isHidden ? 'Ocultar Descripción' : 'Ver Descripción';
+        });
+    }
+    if (product && product.ID_Producto) {
+        logProductView(product.ID_Producto);
+    }
+}
+window.changeMainImage = function(newImageUrl, thumbnailElement) {
+    const mainImage = document.getElementById('mainProductImage');
+    if (mainImage) {
+        mainImage.src = newImageUrl;
+        const thumbnails = document.querySelectorAll('.thumbnail-img');
+        thumbnails.forEach(thumb => thumb.classList.remove('active'));
+        if (thumbnailElement) {
+            thumbnailElement.classList.add('active');
+        }
+    }
+}
+
+function renderProductDetail(container, productId) {
+    if (!container) { console.warn("Contenedor de detalle de producto no encontrado para renderProductDetail"); return; }
+    container.innerHTML = '<p class="text-center text-gray-500 p-4">Cargando detalle del producto...</p>';
+    container.className = "";
+
+    const product = allProducts.find(p => p.ID_Producto == productId);
+    if (product) {
+        renderProductDetailContent(container, product);
+    } else {
+        fetch(`${API_URL}/api/productos/${productId}`)
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => { throw new Error(err.message || `Error ${response.status}`) });
+                }
+                return response.json();
+            })
+            .then(p => {
+                if (!p || !p.ID_Producto) throw new Error('Producto no hallado en la respuesta.');
+                p.precio_unitario = parseFloat(p.precio_unitario) || 0;
+                p.cantidad = parseInt(p.cantidad) || 0;
+                renderProductDetailContent(container, p);
+            })
+            .catch(error => {
+                console.error("Error cargando detalle producto:", error);
+                container.innerHTML = `<p class="text-red-600 text-center p-4">Error al cargar el producto (${error.message}).</p><div class="text-center mt-4"><button id="back-to-products-error" class="btn btn-gray">Volver a Productos</button></div>`;
+                const btnErr = container.querySelector("#back-to-products-error");
+                if (btnErr) { btnErr.addEventListener("click", () => showPageSection("products")); }
+            });
+    }
+}
+
+function renderCategories() {
+    if (!categoryGridContainer) { console.warn("Contenedor de categorías no encontrado"); return; }
+    categoryGridContainer.innerHTML = "";
+    categoriesData.forEach(cat => {
+        const card = document.createElement('div');
+        card.className = 'category-card';
+        card.setAttribute('data-category-id', cat.id);
+        card.innerHTML = `<i class="${cat.icon}"></i><span>${cat.name}</span>`;
+        categoryGridContainer.appendChild(card);
+    });
+}
 
 // --- NUEVAS FUNCIONES PARA HISTORIAL DE PEDIDOS DEL USUARIO ---
-async function loadAndRenderUserOrders() { /* ... (código completo) ... */ }
-function renderUserOrdersTable(orders) { /* ... (código completo) ... */ }
-async function loadAndRenderUserOrderDetail(orderId) { /* ... (código completo) ... */ }
-function renderUserOrderDetailContent(order) { /* ... (código completo) ... */ }
+async function loadAndRenderUserOrders() {
+    if (!orderHistoryListContainer || !orderHistorySection) return;
+    
+    orderHistoryListContainer.innerHTML = '<p class="p-4 text-center text-gray-500">Cargando historial de pedidos...</p>';
+    if (orderDetailViewContainer) orderDetailViewContainer.style.display = 'none';
+    if (orderHistoryMessageDiv) hideMessages(orderHistoryMessageDiv);
+
+    const userId = localStorage.getItem('userId');
+    if (!userId) {
+        if(orderHistoryMessageDiv) showMessage(orderHistoryMessageDiv, 'Error: No se pudo identificar al usuario. Por favor, inicia sesión.', true);
+        orderHistoryListContainer.innerHTML = '<p class="p-4 text-center text-red-600">No se pudo cargar el historial. Intente iniciar sesión de nuevo.</p>';
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/api/user/orders?userId=${userId}`);
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || `Error ${response.status} al obtener pedidos.`);
+        }
+
+        if (data.orders.length === 0) {
+            orderHistoryListContainer.innerHTML = '<p class="p-4 text-center text-gray-500">No tienes pedidos anteriores.</p>';
+            return;
+        }
+        renderUserOrdersTable(data.orders);
+    } catch (error) {
+        console.error("Error cargando historial de pedidos del usuario:", error);
+        if(orderHistoryMessageDiv) showMessage(orderHistoryMessageDiv, `Error al cargar historial: ${error.message}`, true);
+        orderHistoryListContainer.innerHTML = `<p class="p-4 text-center text-red-600">Error al cargar el historial: ${error.message}</p>`;
+    }
+}
+
+function renderUserOrdersTable(orders) {
+    if(!orderHistoryListContainer) return;
+    let tableHTML = `
+        <table class="admin-table w-full">
+            <thead>
+                <tr>
+                    <th class="px-4 py-2 text-left">ID Pedido</th>
+                    <th class="px-4 py-2 text-left">Fecha</th>
+                    <th class="px-4 py-2 text-left">Total</th>
+                    <th class="px-4 py-2 text-left">Estado</th>
+                    <th class="px-4 py-2 text-left">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+    orders.forEach(order => {
+        tableHTML += `
+            <tr>
+                <td class="border px-4 py-2">${order.ID_Pedido}</td>
+                <td class="border px-4 py-2">${new Date(order.Fecha_Pedido).toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' })}</td>
+                <td class="border px-4 py-2">${formatCOP(order.Total_Pedido)}</td>
+                <td class="border px-4 py-2">${order.Estado_Pedido || 'N/A'}</td>
+                <td class="border px-4 py-2">
+                    <button class="btn btn-secondary btn-sm view-user-order-details-btn" data-order-id="${order.ID_Pedido}">Ver Detalles</button>
+                </td>
+            </tr>`;
+    });
+    tableHTML += `</tbody></table>`;
+    orderHistoryListContainer.innerHTML = tableHTML;
+
+    orderHistoryListContainer.querySelectorAll('.view-user-order-details-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const orderId = e.target.dataset.orderId;
+            loadAndRenderUserOrderDetail(orderId);
+        });
+    });
+}
+        
+async function loadAndRenderUserOrderDetail(orderId) {
+    if (!orderDetailViewContainer) return;
+    orderDetailViewContainer.innerHTML = '<p class="p-4 text-center text-gray-500">Cargando detalles del pedido...</p>';
+    orderDetailViewContainer.style.display = 'block';
+    window.scrollTo({ top: orderDetailViewContainer.offsetTop - 80, behavior: 'smooth' });
+
+    const userId = localStorage.getItem('userId');
+    if (!userId) {
+        orderDetailViewContainer.innerHTML = '<p class="p-4 text-center text-red-600">Error: Usuario no identificado para cargar detalles.</p>';
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/api/user/orders/${orderId}?userId=${userId}`);
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || `Error ${response.status} al obtener detalles del pedido.`);
+        }
+        renderUserOrderDetailContent(data.order);
+    } catch (error) {
+        console.error(`Error cargando detalle del pedido ${orderId}:`, error);
+        orderDetailViewContainer.innerHTML = `<p class="p-4 text-center text-red-600">Error al cargar detalles: ${error.message}</p>`;
+    }
+}
+
+function renderUserOrderDetailContent(order) {
+    if(!orderDetailViewContainer) return;
+    let detailsHtml = `
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-2xl font-semibold text-gray-800">Detalle del Pedido #${order.ID_Pedido}</h3>
+            <button id="close-user-order-detail-btn" class="btn btn-sm btn-gray">Cerrar Detalles</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div>
+                <p><strong>Fecha:</strong> ${new Date(order.Fecha_Pedido).toLocaleString('es-CO', { dateStyle: 'full', timeStyle: 'short' })}</p>
+                <p><strong>Total Pagado:</strong> ${formatCOP(order.Total_Pedido)}</p>
+                <p><strong>Estado:</strong> ${order.Estado_Pedido || 'N/A'}</p>
+                <p><strong>Método de Pago:</strong> ${order.Metodo_Pago || 'N/A'}</p>
+                ${order.Referencia_Pago ? `<p><strong>Referencia de Pago:</strong> ${order.Referencia_Pago}</p>` : ''}
+            </div>
+            <div>
+                <h4 class="font-semibold text-lg mb-2 text-gray-700">Información de Envío</h4>
+                <p><strong>Nombre:</strong> ${order.Nombre_Cliente_Envio || 'N/A'}</p>
+                <p><strong>Email:</strong> ${order.Email_Cliente_Envio || 'N/A'}</p>
+                <p><strong>Teléfono:</strong> ${order.Telefono_Cliente_Envio || 'N/A'}</p>
+                <p><strong>Dirección:</strong> ${order.Direccion_Envio || 'N/A'}</p>
+                <p><strong>Ciudad:</strong> ${order.Ciudad_Envio || 'N/A'}, ${order.Departamento_Envio || 'N/A'}</p>
+                ${order.Punto_Referencia_Envio ? `<p><strong>Referencia Adicional:</strong> ${order.Punto_Referencia_Envio}</p>` : ''}
+            </div>
+        </div>
+        <h4 class="font-semibold text-lg mb-3 mt-6 text-gray-700">Productos Comprados</h4>
+        <div class="space-y-3">`;
+
+    if (order.detalles && order.detalles.length > 0) {
+        order.detalles.forEach(item => {
+            const imageUrl = item.Imagen_Producto || `https://placehold.co/60x60/e5e7eb/4b5563?text=NI`;
+            const imageOnError = `this.onerror=null;this.src='https://placehold.co/60x59/fecaca/b91c1c?text=Err';this.alt='Imagen no disponible';`;
+            detailsHtml += `
+                <div class="cart-item flex items-center p-3 border rounded-md bg-gray-50 shadow-sm">
+                    <img src="${imageUrl}" alt="${item.Nombre_Producto || 'Producto'}" class="w-16 h-16 object-contain mr-4 border rounded" onerror="${imageOnError}">
+                    <div class="flex-grow">
+                        <p class="font-semibold text-gray-800">${item.Nombre_Producto || 'Producto sin nombre'}</p>
+                        <p class="text-sm text-gray-600">Cantidad: ${item.Cantidad}</p>
+                        <p class="text-sm text-gray-600">Precio Unitario: ${formatCOP(item.Precio_Unitario_Compra)}</p>
+                    </div>
+                    <p class="font-semibold text-lg text-gray-800">${formatCOP(item.Cantidad * item.Precio_Unitario_Compra)}</p>
+                </div>`;
+        });
+    } else {
+        detailsHtml += '<p class="text-gray-600">No se encontraron detalles de productos para este pedido.</p>';
+    }
+
+    detailsHtml += `</div>`;
+    orderDetailViewContainer.innerHTML = detailsHtml;
+
+    document.getElementById('close-user-order-detail-btn')?.addEventListener('click', () => {
+        if(orderDetailViewContainer) {
+            orderDetailViewContainer.style.display = 'none';
+            orderDetailViewContainer.innerHTML = '';
+        }
+    });
+}
         
 // --- FUNCIONES DE CARGA DE DATOS ---
-async function loadFrontendConfig() { /* ... (código completo) ... */ }
-async function loadAndStorePublicProducts() { /* ... (código completo) ... */ }
-async function loadSiteSettings() { /* ... (código completo) ... */ }
+async function loadFrontendConfig() {
+    console.log(">>> Cargando configuración del frontend desde el backend...");
+    try {
+        const response = await fetch(`${API_URL}/api/config`);
+        if (!response.ok) {
+            throw new Error(`Error ${response.status} al cargar configuración.`);
+        }
+        const configData = await response.json();
+        if (configData.success && configData.wompiPublicKey && configData.frontendBaseUrl) {
+            wompiPublicKey = configData.wompiPublicKey;
+            frontendBaseUrl = configData.frontendBaseUrl;
+            configLoaded = true;
+            console.log(">>> Configuración cargada:", { wompiPublicKey: `pub...${wompiPublicKey.slice(-6)}`, frontendBaseUrl });
+        } else {
+            throw new Error(configData.message || "Respuesta de configuración inválida.");
+        }
+    } catch (error) {
+        console.error("!!! ERROR CRÍTICO AL CARGAR CONFIGURACIÓN FRONTEND:", error);
+        if (pageContent) {
+            const configErrorDiv = document.createElement('div');
+            configErrorDiv.className = 'message message-error p-4 text-center font-bold';
+            configErrorDiv.textContent = 'Error crítico: No se pudo cargar la configuración de pago desde el servidor. El pago no funcionará.';
+            configErrorDiv.style.display = 'block';
+            pageContent.prepend(configErrorDiv);
+        }
+        configLoaded = false;
+    }
+}
+
+async function loadAndStorePublicProducts() {
+    if (productsLoaded && allProducts.length > 0) return true;
+    console.log("Cargando productos públicos...");
+    if(productsDisplayArea) productsDisplayArea.innerHTML = '<p class="col-span-full text-center text-gray-500 p-4">Cargando productos...</p>';
+    if(featuredProductsContainer) featuredProductsContainer.innerHTML = '<p class="col-span-full text-center text-gray-500 p-4">Cargando destacados...</p>';
+
+    try {
+        const response = await fetch(`${API_URL}/api/productos`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        let products = await response.json();
+        allProducts = products.map(p => ({ ...p, precio_unitario: parseFloat(p.precio_unitario) || 0, cantidad: parseInt(p.cantidad) || 0 }));
+        productsLoaded = true;
+        console.log(`Productos públicos cargados: ${allProducts.length}`);
+        updateCartIcon();
+        return true;
+    } catch (error) {
+        console.error("Error cargando productos públicos:", error);
+        allProducts = [];
+        productsLoaded = false;
+        if (productsDisplayArea) productsDisplayArea.innerHTML = '<p class="col-span-full text-red-600 p-4 text-center">Error al cargar productos.</p>';
+        if (featuredProductsContainer) featuredProductsContainer.innerHTML = '<p class="col-span-full text-red-600 p-4 text-center">Error al cargar destacados.</p>';
+        return false;
+    }
+}
+
+async function loadSiteSettings() {
+    console.log("Cargando settings del sitio...");
+    try {
+        const headers = { 'x-admin-simulated': 'true' }; // Simular admin para obtener todos los settings
+        const response = await fetch(`${API_URL}/api/admin/settings`, { headers });
+        if (!response.ok) throw new Error(`HTTP ${response.status} al cargar settings.`);
+        const data = await response.json();
+        if (data.success && data.settings) {
+            console.log("Settings cargados:", data.settings);
+            currentSettings = data.settings;
+            applySiteSettings();
+            return true;
+        } else {
+            throw new Error(data.message || "Respuesta inválida al cargar settings.");
+        }
+    } catch (error) {
+        console.error("Error loadSiteSettings:", error);
+        currentSettings = {}; // Usar defaults si falla
+        applySiteSettings(); // Aplicar defaults
+        return false;
+    }
+}
 
 // --- FUNCIONES DE ADMINISTRACIÓN ---
 async function loadAdminProducts() { /* ... (código completo) ... */ }
@@ -402,8 +1045,8 @@ async function loadAndRenderOrderDetail(orderId) { /* ... (código completo para
 async function updateOrderStatus(orderId, newStatus) { /* ... (código completo para admin) ... */ }
 async function loadAndRenderAnalytics() { /* ... (código completo) ... */ }
 async function loadAndRenderAdminCustomers() { /* ... (código completo) ... */ }
-let lastPendingOrderCount = 0; 
-let orderCheckInterval = null;
+// let lastPendingOrderCount = 0; // Ya definido
+// let orderCheckInterval = null; // Ya definido
 function updateAdminOrderBadges(count) { /* ... (código completo) ... */ }
 async function checkNewOrders() { /* ... (código completo) ... */ }
 
@@ -417,20 +1060,19 @@ async function saveSiteSettings(settingsToSave, type = 'general') { /* ... (cód
 function openImageModal(imageUrl) { /* ... (código completo) ... */ }
 function closeImageModal() { /* ... (código completo) ... */ }
 function closeImageModalOnClick(event) { /* ... (código completo) ... */ }
-function updateUI(isLoggedIn) { /* ... (código completo, incluyendo orderHistoryNavLinkDesktop/Mobile) ... */ }
-async function showPageSection(sectionId, detailId = null) { /* ... (código completo, incluyendo 'order-history') ... */ }
+function updateUI(isLoggedIn) { /* ... (código completo) ... */ }
+async function showPageSection(sectionId, detailId = null) { /* ... (código completo) ... */ }
         
 // --- MANEJADORES DE EVENTOS ---
-function handleLogout() { /* ... (código completo, incluyendo limpieza de userId) ... */ }
+function handleLogout() { /* ... (código completo) ... */ }
 function handleCategoryClick(event) { /* ... (código completo) ... */ }
 function handleGridOrDetailClick(event) { /* ... (código completo) ... */ }
 
 // --- LÓGICA DE INICIALIZACIÓN DE LA APLICACIÓN ---
 document.addEventListener("DOMContentLoaded", async () => {
-    console.log(">>> DOM Cargado. Iniciando App Ferremax...");
+    console.log(">>> DOM Cargado. Iniciando App Ferremax..."); // script.js:430 (aproximado)
     try {
         await loadFrontendConfig();
-        // Limpieza de carrito si es inválido
         try {
             const cartData = localStorage.getItem(CART_STORAGE_KEY);
             if (cartData) {
@@ -453,15 +1095,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (currentYearSpan) currentYearSpan.textContent = new Date().getFullYear();
         
         const isLoggedIn = localStorage.getItem("userLoggedIn") === "true";
-        console.log(">>> Estado Login Inicial:", isLoggedIn);
+        console.log(">>> Estado Login Inicial:", isLoggedIn); // script.js:456
         
-        console.log(">>> Cargando Settings del Sitio...");
+        console.log(">>> Cargando Settings del Sitio..."); // script.js:458
         await loadSiteSettings(); 
         
-        updateUI(isLoggedIn); 
-        updateCartIcon();
-
-        console.log(">>> Añadiendo Listeners...");
+        console.log(">>> Añadiendo Listeners..."); // script.js:464
         if (loginForm) {
             loginForm.addEventListener("submit", async (event) => {
                 event.preventDefault(); 
@@ -487,7 +1126,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                         headers: { "Content-Type": "application/json" }, 
                         body: JSON.stringify({ email, password }) 
                     });
-                    const result = await response.json();
+                    const result = await response.json(); // Intenta parsear como JSON
+                    console.log("Respuesta del backend para /api/login:", result); 
+
                     if (response.ok && result.success && result.user) {
                         localStorage.setItem("userLoggedIn", "true");
                         localStorage.setItem("userEmail", result.user.email);
@@ -504,6 +1145,9 @@ document.addEventListener("DOMContentLoaded", async () => {
                     console.error("Error login fetch:", error); 
                     if (error instanceof TypeError && error.message.toLowerCase().includes("failed to fetch")) {
                          showMessage(loginMessageDiv, "No se pudo conectar con el servidor. Verifica tu conexión o la URL del servidor.", true);
+                    } else if (error instanceof SyntaxError) { 
+                        showMessage(loginMessageDiv, "Respuesta inesperada del servidor. Intenta de nuevo.", true);
+                        console.error("El servidor no devolvió JSON válido. Error original:", error); 
                     } else {
                         showMessage(loginMessageDiv, "Ocurrió un error inesperado. Intenta de nuevo.", true);
                     }
@@ -543,6 +1187,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                         body: JSON.stringify({ username, email, password }) 
                     });
                     const result = await response.json();
+                    console.log("Respuesta del backend para /api/register:", result);
+
                     if (response.ok && result.success) {
                         showMessage(registerMessageDiv, "¡Registro exitoso! Ahora puedes iniciar sesión.", false);
                         setTimeout(() => {
@@ -559,7 +1205,10 @@ document.addEventListener("DOMContentLoaded", async () => {
                     console.error("Error registro fetch:", error); 
                      if (error instanceof TypeError && error.message.toLowerCase().includes("failed to fetch")) {
                         showMessage(registerMessageDiv, "No se pudo conectar con el servidor.", true);
-                    } else {
+                    } else if (error instanceof SyntaxError) {
+                        showMessage(registerMessageDiv, "Respuesta inesperada del servidor al registrar.", true);
+                    }
+                     else {
                         showMessage(registerMessageDiv, "Error al intentar registrar. Intenta de nuevo.", true);
                     }
                 } finally { 
@@ -568,150 +1217,17 @@ document.addEventListener("DOMContentLoaded", async () => {
             });
         }
         
-        if (contactForm && contactSubmitButton) {
-            contactForm.addEventListener("submit", async (event) => {
-                event.preventDefault();
-                if(contactMessageResponseDiv) hideMessages(contactMessageResponseDiv);
-                contactSubmitButton.disabled = true;
-                contactSubmitButton.textContent = "Enviando...";
-                const formData = new FormData(contactForm);
-                const contactData = Object.fromEntries(formData.entries());
-                if (!contactData.name || !contactData.email || !contactData.subject || !contactData.message) {
-                    showMessage(contactMessageResponseDiv, "Por favor, completa todos los campos.", true);
-                    contactSubmitButton.disabled = false;
-                    contactSubmitButton.textContent = "Enviar Mensaje";
-                    return;
-                }
-                try {
-                    const response = await fetch(`${API_URL}/api/contact`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(contactData)
-                    });
-                    const result = await response.json();
-                    if (response.ok && result.success) {
-                        showMessage(contactMessageResponseDiv, "¡Mensaje recibido! Gracias por contactarnos.", false);
-                        contactForm.reset();
-                    } else {
-                        showMessage(contactMessageResponseDiv, result.message || "Error al enviar el mensaje.", true);
-                    }
-                } catch (error) {
-                    console.error("Error contacto fetch:", error);
-                    showMessage(contactMessageResponseDiv, "Error de conexión al enviar el mensaje.", true);
-                } finally {
-                    contactSubmitButton.disabled = false;
-                    contactSubmitButton.textContent = "Enviar Mensaje";
-                }
-            });
-        }
-
-
-        if (logoutButton) logoutButton.addEventListener("click", handleLogout);
-        if (logoutButtonMobile) logoutButtonMobile.addEventListener("click", handleLogout);
+        updateUI(isLoggedIn); 
         
-        if (showRegisterLink) showRegisterLink.addEventListener("click", (event) => { 
-            event.preventDefault(); 
-            if (loginSection) loginSection.style.display = "none"; 
-            if (registerSection) registerSection.style.display = "block"; 
-            hideMessages(); 
-        });
-        if (showLoginLink) showLoginLink.addEventListener("click", (event) => { 
-            event.preventDefault(); 
-            if (registerSection) registerSection.style.display = "none"; 
-            if (loginSection) loginSection.style.display = "block"; 
-            hideMessages(); 
-        });
-
-        navLinks.forEach(link => {
-            link.addEventListener("click", (event) => {
-                const sectionId = link.getAttribute("data-section");
-                if (sectionId) {
-                    event.preventDefault();
-                    showPageSection(sectionId);
-                }
-            });
-        });
-        
-        const promoBtn = document.querySelector('.promo-banner .cta-button'); 
-        if (promoBtn) {
-            promoBtn.addEventListener('click', (e) => {
-                const sectionId = promoBtn.getAttribute('data-section');
-                if (sectionId) {
-                    e.preventDefault();
-                    showPageSection(sectionId);
-                }
-            });
-        }
-        
-        if (mobileMenuButton && mobileMenu) {
-            mobileMenuButton.addEventListener("click", () => {
-                const isExpanded = mobileMenuButton.getAttribute("aria-expanded") === "true";
-                mobileMenuButton.setAttribute("aria-expanded", !isExpanded);
-                mobileMenu.classList.toggle("hidden");
-                const openIcon = mobileMenuButton.querySelector("svg.block");
-                const closeIcon = mobileMenuButton.querySelector("svg.hidden");
-                if (openIcon) openIcon.classList.toggle("hidden");
-                if (closeIcon) closeIcon.classList.toggle("hidden");
-            });
-        }
-        if (adminMenuDesktopButton && adminMenuDesktopDropdown) {
-             adminMenuDesktopButton.addEventListener('click', (e) => { 
-                e.stopPropagation(); 
-                adminMenuDesktopDropdown.classList.toggle('hidden'); 
-            });
-            document.addEventListener('click', (e) => { 
-                if (adminMenuDesktopContainer && !adminMenuDesktopContainer.contains(e.target) && adminMenuDesktopDropdown && !adminMenuDesktopDropdown.classList.contains('hidden')) {
-                    adminMenuDesktopDropdown.classList.add('hidden');
-                }
-            });
-        }
-        
-        if (pageContent) pageContent.addEventListener('click', handleGridOrDetailClick);
-        
-        if (cartItemsContainer) {
-            cartItemsContainer.addEventListener('change', (e) => {
-                if (e.target.matches('.cart-item-qty-input')) {
-                    updateCartQuantity(e.target.dataset.productIdQty, e.target.value);
-                }
-            });
-            cartItemsContainer.addEventListener('click', (e) => {
-                const removeButton = e.target.closest('.cart-item-remove-button');
-                if (removeButton) {
-                    removeFromCart(removeButton.dataset.productIdRemove);
-                }
-            });
-        }
-        
-        if (categoryGridContainer) categoryGridContainer.addEventListener('click', handleCategoryClick);
-        
-        if (addProductButton) addProductButton.addEventListener('click', () => showAdminProductForm());
-        if (adminCancelButton) adminCancelButton.addEventListener('click', showAdminProductList);
-        
-        if (adminProductForm) { /* ... (código completo del listener para adminProductForm submit) ... */ }
-
-        if (saveColorsButton) saveColorsButton.addEventListener('click', () => { /* ... */ });
-        if (saveTextsButton) saveTextsButton.addEventListener('click', () => { /* ... */ });
-        if (saveContactSocialButton) saveContactSocialButton.addEventListener('click', () => { /* ... */ });
-        
-        if (faqAccordion) {
-            faqAccordion.addEventListener('click', (e) => {
-                const question = e.target.closest('.faq-question');
-                if (question) {
-                    const item = question.parentElement;
-                    if (item) item.classList.toggle('active');
-                }
-            });
-        }
-
-        console.log(">>> Mostrando Sección Inicial...");
+        console.log(">>> Mostrando Sección Inicial..."); // script.js:706
         if (isLoggedIn) {
             await showPageSection("home");
         } else {
             console.log(">>> Mostrando sección de Login (usuario no logueado).");
-            // updateUI(false) ya debería haber mostrado la sección de login si es el comportamiento deseado por defecto.
-            // Si loginSection no es null y es la primera vista, se mostrará por defecto o por la lógica en updateUI.
+            if(loginSection) showPageSection("login"); // Mostrar login explícitamente si no está logueado
+            else await showPageSection("home"); // Fallback si no hay loginSection
         }
-        console.log(">>> INICIALIZACIÓN COMPLETA (Ferremax App) <<<");
+        console.log(">>> INICIALIZACIÓN COMPLETA (Ferremax App) <<<"); // script.js:714
     } catch (error) {
         console.error("!!! ERROR CRÍTICO DURANTE LA INICIALIZACIÓN !!!", error);
         if (document.body) {
@@ -727,10 +1243,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const newPrevBtn = document.getElementById("new-prevBtn");
     const newNextBtn = document.getElementById("new-nextBtn");
     
-    // Verificación adicional para asegurarse de que los contenedores del carrusel existen
-    if (!newCarouselSlidesContainer || !newIndicatorsContainer || !newPrevBtn || !newNextBtn) {
+    if (!newCarouselSlidesContainer || !newIndicatorsContainer || !newPrevBtn || !newNextBtn) { // script.js:732
         console.warn("Carousel containers not found for new carousel. El carrusel no se inicializará.");
-        return; // Detener la ejecución del script del carrusel si los elementos no existen
+        return; 
     }
     
     let newCurrentIndex = 0;
