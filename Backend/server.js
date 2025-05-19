@@ -35,7 +35,7 @@ console.log(`--> URL Frontend para Redirección: ${FRONTEND_URL || 'NO DEFINIDA'
 console.log(`--> Entorno Node.js: ${process.env.NODE_ENV || 'development (default)'}`);
 
 // --- CONFIGURACIÓN DEL SITIO DESDE BASE DE DATOS ---
-let siteSettings = {}; 
+let siteSettings = {};
 
 async function loadSiteSettingsFromDB() {
     console.log("--> Cargando siteSettings desde la base de datos...");
@@ -75,7 +75,8 @@ async function loadSiteSettingsFromDB() {
 
     } catch (error) {
         console.error("!!! Error CRÍTICO al cargar siteSettings desde la DB. Usando defaults en memoria:", error);
-        siteSettings = { 
+        // Fallback to in-memory defaults if DB load fails critically
+        siteSettings = {
             colorPrimary: '#ea580c', colorSecondary: '#047857', colorAccent: '#f1f5f9',
             welcomeTitle: 'Bienvenido a Ferremax', promoBannerTitle: '¡Ofertas Imperdibles de Temporada!',
             promoBannerText: 'Encuentra descuentos especiales en herramientas seleccionadas. ¡No te lo pierdas!',
@@ -117,19 +118,21 @@ async function initializeApp() {
         console.log(`--> Conexión exitosa a la base de datos '${connection.config.database}' en ${connection.config.host}:${connection.config.port}`);
         connection.release();
 
-        await loadSiteSettingsFromDB(); 
+        await loadSiteSettingsFromDB();
 
     } catch (error) {
         console.error("!!! Error CRÍTICO al inicializar la aplicación (DB o Settings):", error);
-        if (isProduction) process.exit(1);
+        if (isProduction) process.exit(1); // Exit in production if DB connection fails
     }
 }
 
 // --- MIDDLEWARE DE AUTENTICACIÓN ADMIN ---
 const checkAdmin = (req, res, next) => {
+    // En un entorno real, esto verificaría un token JWT, sesión, etc.
+    // Para este proyecto, simulamos con un header.
     const isAdminSimulated = req.headers['x-admin-simulated'] === 'true';
     if (isAdminSimulated) {
-        next();
+        next(); // Usuario es administrador simulado
     } else {
         console.warn(`\t[Admin Check] Acceso DENEGADO a ruta admin ${req.method} ${req.path}.`);
         res.status(403).json({ success: false, message: 'Acceso prohibido. Se requieren permisos de administrador.' });
@@ -145,10 +148,13 @@ const checkAdmin = (req, res, next) => {
 app.get('/api/config', (req, res) => {
     console.log("--> GET /api/config");
     try {
+        // Estos son datos públicos que el frontend necesita para operar Wompi y redirecciones.
         res.status(200).json({
             success: true,
             wompiPublicKey: WOMPI_PUBLIC_KEY,
             frontendBaseUrl: FRONTEND_URL
+            // No incluir siteSettings aquí si son todos públicos.
+            // Si algunos settings son públicos, agrégalos selectivamente.
         });
         console.log("\t<-- Enviando configuración pública al frontend.");
     } catch (error) {
@@ -174,7 +180,7 @@ app.post('/register', async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, saltRounds);
         const [result] = await dbPool.query(
             'INSERT INTO usuarios (username, email, password, role) VALUES (?, ?, ?, ?)',
-            [username, email, hashedPassword, 'cliente']
+            [username, email, hashedPassword, 'cliente'] // Default role 'cliente'
         );
         console.log(`\t<-- Usuario registrado: ${username} (ID: ${result.insertId})`);
         res.status(201).json({ success: true, message: 'Usuario registrado exitosamente.' });
@@ -227,7 +233,7 @@ app.get('/api/productos', async (req, res) => {
     try {
         let sql = 'SELECT ID_Producto, Nombre, Descripcion, precio_unitario, Marca, Codigo_Barras, ID_Categoria, cantidad, imagen_url, imagen_url_2, imagen_url_3, imagen_url_4, imagen_url_5 FROM producto';
         if (limit && Number.isInteger(limit) && limit > 0) {
-            sql += ` LIMIT ${limit}`; 
+            sql += ` LIMIT ${limit}`; // Asegurarse que limit es un entero
         }
         const [results] = await dbPool.query(sql);
         console.log(`\t<-- Devolviendo ${results.length} productos públicos`);
@@ -277,15 +283,15 @@ app.get('/api/categories', async (req, res) => {
 app.post('/api/contact', async (req, res) => {
     console.log("--> POST /api/contact");
     try {
-        const { name, email, subject, message } = req.body; 
-        if (!name || !email || !message) { // Subject es opcional en la validación pero se guardará si se envía
+        const { name, email, subject, message } = req.body;
+        if (!name || !email || !message) { // Subject is optional for validation but will be saved if provided
             console.warn("\tMensaje de contacto: Faltan datos requeridos (nombre, email, mensaje).");
             return res.status(400).json({ success: false, message: "Nombre, email y mensaje son requeridos." });
         }
-        // Asumiendo que la tabla contact_messages TIENE una columna 'subject'
+        // Assuming contact_messages table HAS a 'subject' column
         await dbPool.query(
             'INSERT INTO contact_messages (name, email, subject, message, created_at) VALUES (?, ?, ?, ?, NOW())',
-            [name, email, subject || null, message] // Guardar subject o NULL si no se provee
+            [name, email, subject || null, message] // Save subject or NULL if not provided
         );
         console.log(`\t<-- Mensaje de contacto de ${name} <${email}> (Asunto: ${subject || 'N/A'}) guardado en BD.`);
         res.status(200).json({ success: true, message: '¡Mensaje recibido! Gracias por contactarnos.' });
@@ -295,17 +301,20 @@ app.post('/api/contact', async (req, res) => {
     }
 });
 
+// Registrar vista de producto
 app.post('/api/products/:id/view', async (req, res) => {
     const { id: productId } = req.params;
     if (isNaN(productId)) {
         return res.status(400).json({ success: false, message: 'ID de producto inválido.' });
     }
     try {
+        // Verificar si el producto existe antes de registrar la vista
         const [productExists] = await dbPool.query('SELECT ID_Producto FROM producto WHERE ID_Producto = ?', [productId]);
         if (productExists.length === 0) {
             return res.status(404).json({ success: false, message: 'Producto no encontrado.' });
         }
         await dbPool.query('INSERT INTO vistas_producto (ID_Producto, Fecha_Vista) VALUES (?, NOW())', [productId]);
+        // No es necesario enviar una respuesta detallada, un 200 OK es suficiente.
         res.status(200).json({ success: true });
     } catch (error) {
         console.error(`!!! Error al registrar vista para producto ID ${productId}:`, error);
@@ -316,12 +325,13 @@ app.post('/api/products/:id/view', async (req, res) => {
 
 // --- RUTAS WOMPI ---
 app.post('/api/wompi/temp-order', async (req, res) => {
-    const { reference, items, total, userId, customerData } = req.body; 
+    const { reference, items, total, userId, customerData } = req.body; // customerData es opcional
     console.log(`--> POST /api/wompi/temp-order (Ref: ${reference})`);
     if (!reference || !Array.isArray(items) || items.length === 0 || total === undefined) {
         console.warn("\tSolicitud rechazada: Datos inválidos para orden temporal.");
         return res.status(400).json({ success: false, message: 'Datos inválidos para orden temporal.' });
     }
+    // Validar estructura de items
     const hasInvalidItem = items.some(item => !item.productId || !item.quantity || item.quantity <= 0 || item.price === undefined);
     if (hasInvalidItem) {
         console.warn("\tSolicitud rechazada: Items inválidos en orden temporal.");
@@ -329,6 +339,7 @@ app.post('/api/wompi/temp-order', async (req, res) => {
     }
     wompiTempOrders[reference] = { items, total, userId, customerData, timestamp: Date.now() };
     console.log(`\t<-- Orden temporal guardada para Ref: ${reference}`);
+    // Limpiar órdenes temporales antiguas
     setTimeout(() => {
         if (wompiTempOrders[reference]) {
             console.log(`\t[Cleanup] Eliminando orden temporal expirada: ${reference}`);
@@ -344,31 +355,39 @@ app.post('/api/wompi/webhook', async (req, res) => {
     const eventData = req.body.data?.transaction;
     const timestamp = req.body.timestamp;
 
+    // Validar estructura básica del payload
     if (!signatureReceived || !eventData || !timestamp || !eventData.reference || eventData.amount_in_cents === undefined || !eventData.currency || !eventData.status) {
         console.warn("\t[Webhook Wompi] Rechazado: Payload inválido o incompleto.");
-        return res.status(200).json({ success: false, message: "Payload inválido o incompleto." }); 
+        return res.status(200).json({ success: false, message: "Payload inválido o incompleto." }); // Wompi espera 200 OK
     }
 
+    // Extraer datos relevantes de la transacción
     const transactionReference = eventData.reference;
     const transactionStatus = eventData.status;
     const amountInCents = eventData.amount_in_cents;
     const currency = eventData.currency;
+
+    // Construir la cadena para la firma
     const stringToSign = `${transactionReference}${amountInCents}${currency}${transactionStatus}${timestamp}${WOMPI_EVENTS_SECRET}`;
     const expectedSignature = crypto.createHash('sha256').update(stringToSign).digest('hex');
 
     console.log(`\tRef: ${transactionReference}, Status: ${transactionStatus}, Amount: ${amountInCents} ${currency}`);
+
+    // Validar la firma
     if (signatureReceived !== expectedSignature) {
         console.error(`\t!!! [Webhook Wompi] FIRMA INVÁLIDA para Ref: ${transactionReference}. ¡POSIBLE FRAUDE!`);
-        return res.status(200).json({ success: true, message: "Firma inválida." });
+        return res.status(200).json({ success: true, message: "Firma inválida." }); // Wompi espera 200 OK
     }
     console.log(`\t[Webhook Wompi] Firma VÁLIDA para Ref: ${transactionReference}`);
 
+    // Obtener detalles de la orden temporal
     const orderDetails = wompiTempOrders[transactionReference];
     if (!orderDetails) {
         console.warn(`\t[Webhook Wompi] No se encontraron datos temporales para Ref: ${transactionReference}. Pudo expirar, ser procesada ya, o ser una transacción antigua/inválida.`);
         return res.status(200).json({ success: true, message: "Orden no encontrada o ya procesada/expirada." });
     }
 
+    // Procesar la orden si está APROBADA
     if (transactionStatus === 'APPROVED') {
         console.log(`\t[Webhook Wompi] Transacción APROBADA para Ref: ${transactionReference}. Intentando actualizar stock y guardar pedido...`);
         let connection;
@@ -380,12 +399,14 @@ app.post('/api/wompi/webhook', async (req, res) => {
             await connection.beginTransaction();
             console.log("\t\tIniciando transacción DB para actualizar stock y guardar pedido...");
 
+            // 1. Actualizar stock de productos
             for (const item of orderDetails.items) {
                 const [updateResult] = await connection.query(
                     'UPDATE producto SET cantidad = GREATEST(0, cantidad - ?) WHERE ID_Producto = ? AND cantidad >= ?',
                     [item.quantity, item.productId, item.quantity]
                 );
                 if (updateResult.affectedRows === 0) {
+                    // Stock insuficiente o producto no encontrado (aunque debería estar validado antes)
                     const [checkProduct] = await connection.query('SELECT Nombre, cantidad FROM producto WHERE ID_Producto = ?', [item.productId]);
                     const productName = checkProduct.length > 0 ? checkProduct[0].Nombre : `ID ${item.productId}`;
                     const currentStock = checkProduct.length > 0 ? checkProduct[0].cantidad : 'N/A';
@@ -399,9 +420,11 @@ app.post('/api/wompi/webhook', async (req, res) => {
                 await connection.rollback();
                 console.error(`\t\t!!! Rollback DB ejecutado (actualización de stock fallida) para Ref: ${transactionReference} debido a: ${failureMessage}`);
             } else {
+                // 2. Crear el pedido en la tabla `pedidos`
                 console.log("\t\tStock actualizado correctamente.");
-                const tempOrderData = wompiTempOrders[transactionReference];
-                const userId = tempOrderData?.userId || null;
+                const tempOrderData = wompiTempOrders[transactionReference]; // Re-obtener por si acaso
+                const userId = tempOrderData?.userId || null; // Si el usuario estaba logueado
+                // Datos del cliente desde Wompi o fallback de datos temporales
                 const nombreClienteEnvio = tempOrderData?.customerData?.fullName || eventData.customer_email || 'Cliente Wompi';
                 const emailClienteEnvio = eventData.customer_email || tempOrderData?.customerData?.email || 'N/A';
                 const telefonoClienteEnvio = tempOrderData?.customerData?.phoneNumber || 'N/A';
@@ -411,15 +434,16 @@ app.post('/api/wompi/webhook', async (req, res) => {
                 const [pedidoResult] = await connection.query(
                     `INSERT INTO pedidos (ID_Usuario, Total_Pedido, Estado_Pedido, Metodo_Pago, Referencia_Pago, Nombre_Cliente_Envio, Email_Cliente_Envio, Telefono_Cliente_Envio, Direccion_Envio, Departamento_Envio, Ciudad_Envio, Punto_Referencia_Envio, Fecha_Pedido)
                      VALUES (?, ?, 'Pagado', 'Wompi', ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
-                    [userId, orderDetails.total, transactionReference, 
-                     nombreClienteEnvio, emailClienteEnvio, telefonoClienteEnvio, direccionEnvio, 
-                     eventData.shipping_address?.region || null, 
-                     eventData.shipping_address?.city || null,
-                     eventData.shipping_address?.address_line_2 || null 
+                    [userId, orderDetails.total, transactionReference,
+                     nombreClienteEnvio, emailClienteEnvio, telefonoClienteEnvio, direccionEnvio,
+                     eventData.shipping_address?.region || null, // Departamento
+                     eventData.shipping_address?.city || null,   // Ciudad
+                     eventData.shipping_address?.address_line_2 || null // Punto de referencia
                     ]
                 );
                 const pedidoId = pedidoResult.insertId;
 
+                // 3. Insertar detalles del pedido en `detalles_pedido`
                 const detallePromises = orderDetails.items.map(item => {
                     return connection.query(
                         'INSERT INTO detalles_pedido (ID_Pedido, ID_Producto, Cantidad, Precio_Unitario_Compra) VALUES (?, ?, ?, ?)',
@@ -430,23 +454,24 @@ app.post('/api/wompi/webhook', async (req, res) => {
                 console.log(`\t\tPedido ID ${pedidoId} y sus detalles guardados en BD.`);
                 await connection.commit();
                 console.log(`\t\tCommit DB exitoso. Pedido guardado y Stock actualizado para Ref: ${transactionReference}.`);
-                delete wompiTempOrders[transactionReference];
+                delete wompiTempOrders[transactionReference]; // Eliminar orden temporal
                 console.log(`\t\tDatos temporales eliminados para Ref: ${transactionReference}.`);
             }
             res.status(200).json({ success: true, message: `Webhook procesado. Estado Wompi: ${transactionStatus}. Resultado DB: ${updateFailed ? `FALLIDO (Rollback) - ${failureMessage}` : 'OK (Commit)'}` });
         } catch (dbError) {
             console.error(`\t\t!!! Error CRÍTICO DB durante actualización para Ref: ${transactionReference}:`, dbError);
             if (connection) { try { await connection.rollback(); console.log("\t\tRollback DB ejecutado por error crítico."); } catch (rollErr) { console.error("\t\t!!! Error durante Rollback:", rollErr); } }
-            res.status(200).json({ success: true, message: "Webhook recibido, error interno crítico en DB." });
+            res.status(200).json({ success: true, message: "Webhook recibido, error interno crítico en DB." }); // Wompi espera 200 OK
         } finally {
             if (connection) { connection.release(); console.log("\t\tConexión DB liberada."); }
         }
     } else if (['DECLINED', 'VOIDED', 'ERROR'].includes(transactionStatus)) {
         console.log(`\t[Webhook Wompi] Transacción ${transactionStatus} para Ref: ${transactionReference}. No se actualiza stock.`);
-        delete wompiTempOrders[transactionReference];
+        delete wompiTempOrders[transactionReference]; // Eliminar orden temporal
         console.log(`\t\tDatos temporales eliminados para Ref: ${transactionReference}.`);
         res.status(200).json({ success: true, message: `Webhook procesado. Estado: ${transactionStatus}` });
     } else {
+        // Otros estados (PENDING, etc.) no modifican la DB directamente aquí, se espera estado final.
         console.log(`\t[Webhook Wompi] Estado no manejado explícitamente (${transactionStatus}) para Ref: ${transactionReference}. Esperando estado final.`);
         res.status(200).json({ success: true, message: `Webhook recibido. Estado: ${transactionStatus}` });
     }
@@ -458,9 +483,10 @@ app.post('/api/orders/cash-on-delivery', async (req, res) => {
     console.log("--> POST /api/orders/cash-on-delivery");
     const { cart, customerInfo } = req.body;
 
+    // Validación de datos de entrada
     if (!cart || cart.length === 0 || !customerInfo ||
         !customerInfo.name || !customerInfo.phone || !customerInfo.address ||
-        !customerInfo.department || !customerInfo.city || 
+        !customerInfo.department || !customerInfo.city || // Nuevos campos obligatorios
         !customerInfo.email) {
         return res.status(400).json({ success: false, message: "Faltan datos del carrito o del cliente (incluyendo departamento y ciudad)." });
     }
@@ -471,40 +497,46 @@ app.post('/api/orders/cash-on-delivery', async (req, res) => {
         await connection.beginTransaction();
         console.log("\tIniciando transacción para pedido contra entrega...");
 
+        // 1. Verificar stock y calcular total (usando precios de la DB para seguridad)
         let totalPedido = 0;
         for (const item of cart) {
+            // FOR UPDATE bloquea la fila para evitar race conditions con el stock
             const [productDB] = await connection.query('SELECT Nombre, precio_unitario, cantidad FROM producto WHERE ID_Producto = ? FOR UPDATE', [item.productId]);
             if (productDB.length === 0) throw new Error(`Producto ID ${item.productId} no encontrado.`);
             if (productDB[0].cantidad < item.quantity) {
                 throw new Error(`Stock insuficiente para ${productDB[0].Nombre}. Disponible: ${productDB[0].cantidad}, Solicitado: ${item.quantity}. Por favor, ajusta tu carrito.`);
             }
-            item.price = productDB[0].precio_unitario; 
+            item.price = productDB[0].precio_unitario; // Usar precio de DB
             totalPedido += item.price * item.quantity;
         }
 
+        // 2. Crear el pedido
         const [pedidoResult] = await connection.query(
             `INSERT INTO pedidos (
                 ID_Usuario, Total_Pedido, Estado_Pedido, Metodo_Pago, 
                 Nombre_Cliente_Envio, Direccion_Envio, 
-                Departamento_Envio, Ciudad_Envio, Punto_Referencia_Envio,
+                Departamento_Envio, Ciudad_Envio, Punto_Referencia_Envio, /* Nuevo */
                 Telefono_Cliente_Envio, Email_Cliente_Envio, Fecha_Pedido
              ) VALUES (?, ?, 'Pendiente de Confirmacion', 'ContraEntrega', ?, ?, ?, ?, ?, ?, ?, NOW())`,
             [
-                customerInfo.userId || null, totalPedido,
+                customerInfo.userId || null, // Si el usuario está logueado
+                totalPedido,
                 customerInfo.name, customerInfo.address,
-                customerInfo.department, customerInfo.city, customerInfo.referencePoint || null, 
+                customerInfo.department, customerInfo.city, customerInfo.referencePoint || null, // Nuevo
                 customerInfo.phone, customerInfo.email
             ]
         );
         const pedidoId = pedidoResult.insertId;
         console.log(`\tPedido contra entrega ID ${pedidoId} creado con dirección completa.`);
 
+        // 3. Insertar detalles y actualizar stock
         for (const item of cart) {
             await connection.query(
                 'INSERT INTO detalles_pedido (ID_Pedido, ID_Producto, Cantidad, Precio_Unitario_Compra) VALUES (?, ?, ?, ?)',
                 [pedidoId, item.productId, item.quantity, item.price]
             );
-            await connection.query( 
+            // Actualizar stock
+            await connection.query( // Ya se hizo lock con FOR UPDATE, seguro actualizar
                 'UPDATE producto SET cantidad = cantidad - ? WHERE ID_Producto = ?',
                 [item.quantity, item.productId]
             );
@@ -514,9 +546,10 @@ app.post('/api/orders/cash-on-delivery', async (req, res) => {
         console.log("\tCommit: Pedido contra entrega procesado exitosamente.");
         res.status(201).json({ success: true, message: "Pedido contra entrega recibido exitosamente.", orderId: pedidoId });
     } catch (error) {
-        if (connection) await connection.rollback();
+        if (connection) await connection.rollback(); // Rollback en caso de error
         console.error("!!! Error procesando pedido contra entrega:", error);
-        res.status(error.message.includes("Stock insuficiente") ? 409 : 500) 
+        // Devolver 409 (Conflict) si es por stock insuficiente
+        res.status(error.message.includes("Stock insuficiente") ? 409 : 500)
            .json({ success: false, message: error.message || "Error interno al procesar el pedido contra entrega." });
     } finally {
         if (connection) connection.release();
@@ -567,6 +600,7 @@ app.post('/api/admin/products', checkAdmin, async (req, res) => {
         if (isNaN(cantidadNum) || cantidadNum < 0) return res.status(400).json({ success: false, message: 'Cantidad inválida.' });
         if (ID_Categoria && isNaN(categoriaId)) return res.status(400).json({ success: false, message: 'ID Categoría inválido.' });
 
+
         const sql = `INSERT INTO producto (Nombre, Descripcion, precio_unitario, Marca, Codigo_Barras, ID_Categoria, cantidad, imagen_url, imagen_url_2, imagen_url_3, imagen_url_4, imagen_url_5) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
         const values = [Nombre, Descripcion || null, precioNum, Marca, Codigo_Barras || null, categoriaId, cantidadNum, imagen_url || null, imagen_url_2 || null, imagen_url_3 || null, imagen_url_4 || null, imagen_url_5 || null];
         const [result] = await dbPool.query(sql, values);
@@ -613,6 +647,7 @@ app.delete('/api/admin/products/:id', checkAdmin, async (req, res) => {
     console.log(`--> DELETE /api/admin/products/${id}`);
     if (isNaN(id)) return res.status(400).json({ success: false, message: 'ID inválido.' });
     try {
+        // Podrías añadir verificación de si el producto está en detalles_pedido antes de eliminar
         const [result] = await dbPool.query('DELETE FROM producto WHERE ID_Producto = ?', [id]);
         if (result.affectedRows === 0) return res.status(404).json({ success: false, message: 'Producto no encontrado para eliminar.' });
         res.status(200).json({ success: true, message: 'Producto eliminado exitosamente.' });
@@ -623,13 +658,15 @@ app.delete('/api/admin/products/:id', checkAdmin, async (req, res) => {
     }
 });
 
-
+// USUARIOS (Admin)
 app.get('/api/admin/users', checkAdmin, async (req, res) => {
+    console.log("--> GET /api/admin/users");
     try {
         const [users] = await dbPool.query('SELECT id, username, email, role FROM usuarios ORDER BY id DESC');
+        console.log(`\t<-- Devolviendo ${users.length} usuarios para admin`);
         res.status(200).json(users);
     } catch (error) {
-        console.error("!!! Error GET /api/admin/users:", error); 
+        console.error("!!! Error GET /api/admin/users:", error);
         res.status(500).json({ success: false, message: "Error al obtener usuarios." });
     }
 });
@@ -638,39 +675,44 @@ app.get('/api/admin/users', checkAdmin, async (req, res) => {
 // SETTINGS
 app.get('/api/admin/settings', checkAdmin, (req, res) => {
     console.log("--> GET /api/admin/settings");
+    // Devuelve los settings cargados en memoria (que vienen de la BD o defaults)
     res.status(200).json({ success: true, settings: siteSettings });
 });
 
 app.put('/api/admin/settings', checkAdmin, async (req, res) => {
     console.log("--> PUT /api/admin/settings");
     const newSettings = req.body;
-    const allowedKeys = [
+    const allowedKeys = [ // Lista de claves permitidas para actualizar
         'colorPrimary', 'colorSecondary', 'colorAccent',
         'welcomeTitle', 'promoBannerTitle', 'promoBannerText',
         'contactAddress', 'contactPhone', 'contactEmail',
         'socialFacebook', 'socialTwitter', 'socialInstagram', 'socialYoutube'
     ];
     let dbOperations = [];
-    let changesMade = false;
+    let changesMade = false; // Para saber si hubo algún cambio válido
 
     console.log("\tDatos recibidos para actualizar settings:", newSettings);
 
     for (const key in newSettings) {
         if (allowedKeys.includes(key) && newSettings[key] !== undefined) {
+            // Validación simple para colores y URLs
             if (key.startsWith('color') && typeof newSettings[key] === 'string' && !/^#[0-9A-Fa-f]{3}([0-9A-Fa-f]{3})?$/.test(newSettings[key])) {
                 console.warn(`\tIgnorando setting '${key}' por formato de color inválido: ${newSettings[key]}`);
-                continue;
+                continue; // Saltar este setting
             }
             if (key.startsWith('social') && typeof newSettings[key] === 'string' && newSettings[key] && !newSettings[key].startsWith('http')) {
                  console.warn(`\tIgnorando setting '${key}' por formato de URL inválido (debe empezar con http/https): ${newSettings[key]}`);
-                 continue;
+                 continue; // Saltar este setting
             }
 
+
             const valueToStore = typeof newSettings[key] === 'string' ? newSettings[key].trim() : newSettings[key];
+            // Asegurar que null o undefined se guardan como string vacío si es necesario para la BD, o manejar como NULL.
+            // Para este caso, si es null/undefined, guardamos string vacío.
             const finalValue = (valueToStore === null || valueToStore === undefined) ? '' : valueToStore;
 
-            if (siteSettings[key] !== finalValue) { 
-                siteSettings[key] = finalValue; 
+            if (siteSettings[key] !== finalValue) { // Solo actualizar si el valor es diferente
+                siteSettings[key] = finalValue; // Actualizar en memoria
                 changesMade = true;
                 dbOperations.push(
                     dbPool.query(
@@ -692,9 +734,11 @@ app.put('/api/admin/settings', checkAdmin, async (req, res) => {
             res.status(200).json({ success: true, message: 'Configuración actualizada.', settings: siteSettings });
         } catch (error) {
             console.error("!!! Error al guardar settings en la DB:", error);
+            // No revertir siteSettings en memoria aquí, ya que el error es de BD.
+            // El frontend debería re-solicitar los settings para obtener el estado actual.
             res.status(500).json({ success: false, message: 'Error al guardar la configuración en la base de datos.'});
         }
-    } else if (changesMade) { 
+    } else if (changesMade) { // Cambios en memoria pero no requirieron DB (e.g., valor ya era el mismo)
         console.log("\t<-- No se realizaron cambios que requirieran actualización de base de datos, pero settings en memoria actualizados.");
         res.status(200).json({ success: true, message: 'Configuración actualizada (sin cambios en BD).', settings: siteSettings });
     }
@@ -729,14 +773,14 @@ app.get('/api/admin/orders/:id', checkAdmin, async (req, res) => {
     console.log(`--> GET /api/admin/orders/${pedidoId}`);
     if (isNaN(pedidoId)) return res.status(400).json({ success: false, message: "ID de pedido inválido." });
     try {
-        const [pedidoInfo] = await dbPool.query( 
+        const [pedidoInfo] = await dbPool.query( // Obtener información del pedido y del cliente
             `SELECT p.*, COALESCE(u.username, p.Nombre_Cliente_Envio) as Cliente_Nombre, COALESCE(u.email, p.Email_Cliente_Envio) as Cliente_Email
              FROM pedidos p
              LEFT JOIN usuarios u ON p.ID_Usuario = u.id
              WHERE p.ID_Pedido = ?`, [pedidoId]
         );
         if (pedidoInfo.length === 0) return res.status(404).json({ success: false, message: "Pedido no encontrado." });
-        const [detalles] = await dbPool.query(
+        const [detalles] = await dbPool.query( // Obtener detalles del pedido
             `SELECT dp.*, prod.Nombre as Nombre_Producto, prod.imagen_url as Imagen_Producto
              FROM detalles_pedido dp
              JOIN producto prod ON dp.ID_Producto = prod.ID_Producto
@@ -753,7 +797,7 @@ app.put('/api/admin/orders/:id/status', checkAdmin, async (req, res) => {
     const { id: pedidoId } = req.params;
     const { nuevoEstado } = req.body;
     console.log(`--> PUT /api/admin/orders/${pedidoId}/status - Nuevo estado: ${nuevoEstado}`);
-    const estadosValidos = ['Pendiente de Pago','Pagado','Procesando','Enviado','Entregado','Cancelado','Pendiente de Confirmacion'];
+    const estadosValidos = ['Pendiente de Pago','Pagado','Procesando','Enviado','Entregado','Cancelado','Pendiente de Confirmacion']; // Incluir 'Pendiente de Confirmacion'
     if (!estadosValidos.includes(nuevoEstado)) {
         return res.status(400).json({ success: false, message: "Estado de pedido inválido." });
     }
@@ -771,6 +815,7 @@ app.put('/api/admin/orders/:id/status', checkAdmin, async (req, res) => {
 app.get('/api/admin/analytics/sales-overview', checkAdmin, async (req, res) => {
     console.log("--> GET /api/admin/analytics/sales-overview");
     try {
+        // Ventas diarias de los últimos 30 días
         const [dailySales] = await dbPool.query(
             `SELECT DATE_FORMAT(Fecha_Pedido, '%Y-%m-%d') as dia, SUM(Total_Pedido) as total_ventas
              FROM pedidos
@@ -778,6 +823,7 @@ app.get('/api/admin/analytics/sales-overview', checkAdmin, async (req, res) => {
              GROUP BY DATE_FORMAT(Fecha_Pedido, '%Y-%m-%d')
              ORDER BY dia ASC`
         );
+        // Top 10 productos vendidos
         const [topProducts] = await dbPool.query(
             `SELECT p.Nombre, SUM(dp.Cantidad) as total_vendido
              FROM detalles_pedido dp
@@ -802,7 +848,7 @@ app.get('/api/admin/analytics/product-views', checkAdmin, async (req, res) => {
              FROM vistas_producto vp
              JOIN producto p ON vp.ID_Producto = p.ID_Producto
              GROUP BY vp.ID_Producto, p.Nombre
-             ORDER BY total_vistas DESC LIMIT 20` 
+             ORDER BY total_vistas DESC LIMIT 20` // Limitar a los 20 más vistos
         );
         res.status(200).json(productViews);
     } catch (error) {
@@ -815,6 +861,7 @@ app.get('/api/admin/analytics/product-views', checkAdmin, async (req, res) => {
 app.get('/api/admin/orders/pending-count', checkAdmin, async (req, res) => {
     console.log("--> GET /api/admin/orders/pending-count");
     try {
+        // Contar pedidos que están pendientes de confirmación (contra entrega) o pagados pero aún no procesados/enviados
         const [rows] = await dbPool.query(
             "SELECT COUNT(*) as pendingCount FROM pedidos WHERE Estado_Pedido IN ('Pendiente de Confirmacion', 'Pagado')"
             // Si 'Pagado' significa que ya está listo para procesar y no ha sido 'Procesando' o 'Enviado'
@@ -829,14 +876,15 @@ app.get('/api/admin/orders/pending-count', checkAdmin, async (req, res) => {
 });
 
 
-// MENSAJES DE CONTACTO
+// MENSAJES DE CONTACTO (Admin)
 app.get('/api/admin/contact-messages', checkAdmin, async (req, res) => {
     console.log("--> GET /api/admin/contact-messages");
     try {
         const [messages] = await dbPool.query(
-            // Asegúrate de que la columna 'subject' exista o elimínala de la consulta
+            // Asegúrate de que la columna 'subject' exista en tu tabla contact_messages o elimínala de la consulta
             'SELECT id, name, email, subject, LEFT(message, 100) as message_preview, created_at FROM contact_messages ORDER BY created_at DESC'
         );
+        console.log(`\t<-- Devolviendo ${messages.length} mensajes de contacto para admin`);
         res.status(200).json(messages);
     } catch (error) {
         console.error("!!! Error GET /api/admin/contact-messages:", error);
@@ -855,7 +903,7 @@ initializeApp().then(() => {
     });
 }).catch(err => {
     console.error("Fallo al inicializar la aplicación:", err);
-    process.exit(1);
+    process.exit(1); // Salir si la inicialización falla
 });
 
 
