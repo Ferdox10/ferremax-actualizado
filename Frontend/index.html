@@ -4,31 +4,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ferremax</title>
-    <!-- Tailwind CSS CDN -->
+    <title>Ferremax con HTML</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap"
         rel="stylesheet">
-    <!-- Font Awesome CDN -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
-    <!-- Wompi Widget -->
     <script src="https://checkout.wompi.co/widget.js"></script>
-    <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Enlace a tu archivo CSS personalizado -->
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body class="flex flex-col min-h-screen">
+
     <div class="flex-grow">
 
         <!-- SECCIÓN DE LOGIN -->
         <section id="login-section" class="container mx-auto mt-10 p-6 max-w-md bg-white rounded-lg shadow-md">
-            <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Ferremax - Iniciar Sesión</h2>
+            <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Ferremax - Iniciar
+                Sesión</h2>
             <div id="login-message" class="message"></div>
             <form id="loginForm">
                 <div class="mb-4">
@@ -44,7 +40,8 @@
                         placeholder="********" required>
                 </div>
                 <div class="flex items-center justify-between mb-4">
-                    <button type="submit" class="btn btn-primary btn-full">Iniciar Sesión</button>
+                    <button type="submit" class="btn btn-primary btn-full">Iniciar
+                        Sesión</button>
                 </div>
                 <p class="text-center text-gray-600 text-sm">¿No tienes cuenta? <a href="#" id="show-register"
                         class="link-primary">Regístrate</a></p>
@@ -54,7 +51,8 @@
         <!-- SECCIÓN DE REGISTRO -->
         <section id="register-section" class="container mx-auto mt-10 p-6 max-w-md bg-white rounded-lg shadow-md"
             style="display: none;">
-            <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Ferremax - Registrarse</h2>
+            <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">Ferremax -
+                Registrarse</h2>
             <div id="register-message" class="message"></div>
             <form id="registerForm">
                 <div class="mb-4">
@@ -89,159 +87,591 @@
         <section id="main-content" style="display: none;">
             <!-- HEADER -->
             <header class="main-header sticky top-0 z-50">
-                 <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="container mx-auto px-4 sm:px-6 lg:px-8">
                     <div class="flex items-center justify-between h-16">
                         <div class="flex items-center">
-                            <img src="https://placehold.co/40x40/ea580c/ffffff?text=F" alt="Logo Ferremax" class="h-8 w-8 rounded-full mr-2">
+                            <img src="https://placehold.co/40x40/ea580c/ffffff?text=F" alt="Logo Ferremax"
+                                class="h-8 w-8 rounded-full mr-2">
                             <h1 class="text-xl sm:text-2xl font-bold">Ferremax</h1>
                         </div>
                         <nav class="hidden sm:flex sm:items-center sm:space-x-4">
-                            <a href="#" class="nav-link px-3 py-2 rounded-md text-sm font-medium admin-nav-item" data-section="home">Inicio</a>
-                            <a href="#" class="nav-link px-3 py-2 rounded-md text-sm font-medium admin-nav-item" data-section="products">Productos</a>
-                            <a href="#" class="nav-link px-3 py-2 rounded-md text-sm font-medium admin-nav-item cart-icon-container relative" data-section="cart" title="Ver Carrito">
+                            <a href="#" class="nav-link px-3 py-2 rounded-md text-sm font-medium admin-nav-item"
+                                data-section="home">Inicio</a>
+                            <a href="#" class="nav-link px-3 py-2 rounded-md text-sm font-medium admin-nav-item"
+                                data-section="products">Productos</a>
+                            <a href="#"
+                                class="nav-link px-3 py-2 rounded-md text-sm font-medium admin-nav-item cart-icon-container relative"
+                                data-section="cart" title="Ver Carrito">
                                 <i class="fas fa-shopping-cart"></i>
-                                <span id="cart-item-count-desktop" class="cart-item-count" style="display: none;">0</span>
+                                <span id="cart-item-count-desktop" class="cart-item-count"
+                                    style="display: none;">0</span>
                             </a>
-                            <a href="#" id="order-history-nav-link-desktop" class="nav-link px-3 py-2 rounded-md text-sm font-medium admin-nav-item" data-section="order-history" style="display: none;">Historial de Pedidos</a>
-                            <a href="#" class="nav-link px-3 py-2 rounded-md text-sm font-medium admin-nav-item" data-section="contact">Contacto</a>
-                            <a href="#" class="nav-link px-3 py-2 rounded-md text-sm font-medium admin-nav-item" data-section="policies">Políticas</a>
-                            <a href="#" class="nav-link px-3 py-2 rounded-md text-sm font-medium admin-nav-item" data-section="faq">FAQ</a>
+                            <a href="#" class="nav-link px-3 py-2 rounded-md text-sm font-medium admin-nav-item"
+                                data-section="contact">Contacto</a>
+                            <a href="#" class="nav-link px-3 py-2 rounded-md text-sm font-medium admin-nav-item"
+                                data-section="policies">Políticas</a>
+                            <a href="#" class="nav-link px-3 py-2 rounded-md text-sm font-medium admin-nav-item"
+                                data-section="faq">FAQ</a>
+
                             <div id="admin-menu-desktop-container" class="relative" style="display: none;">
-                                <button id="admin-menu-desktop-button" class="btn btn-sm btn-gray px-3 py-2 text-sm font-medium">
+                                <button id="admin-menu-desktop-button"
+                                    class="btn btn-primary px-3 py-2 text-sm font-medium">
                                     Administración <i class="fas fa-caret-down ml-1"></i>
                                 </button>
-                                <div id="admin-menu-desktop-dropdown" class="hidden absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200">
-                                    <a href="#" class="nav-link block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 admin-nav-item" data-section="admin-products">Gestionar Productos</a>
-                                    <a href="#" class="nav-link block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 admin-nav-item" data-section="admin-orders">Gestionar Pedidos <span id="admin-orders-badge-desktop" class="admin-order-notification-badge" style="display:none;"></span></a>
-                                    <a href="#" class="nav-link block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 admin-nav-item" data-section="admin-personalize">Personalizar Sitio</a>
-                                    <a href="#" class="nav-link block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 admin-nav-item" data-section="admin-product-stats">Estadísticas Prod.</a>
-                                    <a href="#" class="nav-link block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 admin-nav-item" data-section="admin-analytics">Analíticas Ventas</a>
-                                    <a href="#" class="nav-link block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 admin-nav-item" data-section="admin-customers">Clientes</a>
+                                <div id="admin-menu-desktop-dropdown"
+                                    class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
+                                    <a href="#"
+                                        class="nav-link block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 admin-nav-item"
+                                        data-section="admin-products">Gestionar Productos</a>
+                                    <a href="#"
+                                        class="nav-link block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 admin-nav-item"
+                                        data-section="admin-personalize">Personalizar Sitio</a>
+                                    <a href="#"
+                                        class="nav-link block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 admin-nav-item"
+                                        data-section="admin-orders">Pedidos <span id="admin-orders-badge-desktop" class="admin-order-notification-badge" style="display:none;"></span></a>
+                                    <a href="#"
+                                        class="nav-link block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 admin-nav-item"
+                                        data-section="admin-product-stats">Estadísticas Prod.</a>
+                                    <a href="#"
+                                        class="nav-link block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 admin-nav-item"
+                                        data-section="admin-analytics">Analíticas</a>
+                                    <a href="#"
+                                        class="nav-link block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 admin-nav-item"
+                                        data-section="admin-customers">Clientes</a>
                                 </div>
                             </div>
-                            <button id="logoutButton" class="btn btn-danger btn-sm py-1 px-3 text-sm ml-2">Cerrar Sesión</button>
+                            <button id="logoutButton" class="btn btn-danger py-1 px-3 text-sm ml-2">Cerrar
+                                Sesión</button>
                         </nav>
+
                         <div class="sm:hidden flex items-center">
-                            <a href="#" class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white admin-nav-item cart-icon-container relative mr-2" data-section="cart" title="Ver Carrito">
+                            <a href="#"
+                                class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white admin-nav-item cart-icon-container mr-2"
+                                data-section="cart" title="Ver Carrito">
                                 <i class="fas fa-shopping-cart"></i>
-                                <span id="cart-item-count-mobile-icon" class="cart-item-count" style="display: none;">0</span>
+                                <span id="cart-item-count-mobile-icon" class="cart-item-count"
+                                    style="display: none;">0</span>
                             </a>
-                            <button id="mobile-menu-button" type="button" class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white" aria-controls="mobile-menu" aria-expanded="false">
+                            <button id="mobile-menu-button" type="button"
+                                class="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white"
+                                aria-controls="mobile-menu" aria-expanded="false">
                                 <span class="sr-only">Abrir menú</span>
-                                <svg class="block h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16m-7 6h7" /></svg>
-                                <svg class="hidden h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                <svg class="block h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M4 6h16M4 12h16m-7 6h7" />
+                                </svg>
+                                <svg class="hidden h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                    viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M6 18L18 6M6 6l12 12" />
+                                </svg>
                             </button>
                         </div>
                     </div>
                 </div>
-                <div class="sm:hidden hidden bg-gray-800 text-white" id="mobile-menu">
+
+                <!-- MENÚ MÓVIL -->
+                <div class="sm:hidden hidden" id="mobile-menu">
                     <div class="px-2 pt-2 pb-3 space-y-1">
-                        <a href="#" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item" data-section="home">Inicio</a>
-                        <a href="#" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item" data-section="products">Productos</a>
-                         <a href="#" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item" data-section="cart">
+                        <a href="#"
+                            class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item"
+                            data-section="home">Inicio</a>
+                        <a href="#"
+                            class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item"
+                            data-section="products">Productos</a>
+                        <a href="#"
+                            class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item"
+                            data-section="cart">
                             <i class="fas fa-shopping-cart w-4 inline-block mr-1"></i> Carrito
-                            <span id="cart-item-count-mobile-menu" class="cart-item-count inline-block ml-1 align-middle" style="display: none;">0</span>
+                            <span id="cart-item-count-mobile-menu" class="cart-item-count inline-block ml-1 align-middle"
+                                style="display: none;">0</span>
                         </a>
-                        <a href="#" id="order-history-nav-link-mobile" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item" data-section="order-history" style="display: none;">Historial de Pedidos</a>
-                        <a href="#" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item" data-section="contact">Contacto</a>
-                        <a href="#" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item" data-section="policies">Políticas</a>
-                        <a href="#" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item" data-section="faq">FAQ</a>
-                        <div id="admin-menu-mobile-container" class="pt-2 border-t border-gray-700 mt-2" style="display: none;">
-                            <span class="block px-3 pt-2 pb-1 text-xs font-semibold text-gray-400 uppercase">Administración</span>
-                            <a href="#" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item" data-section="admin-products">Gestionar Productos</a>
-                            <a href="#" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item" data-section="admin-orders">Gestionar Pedidos <span id="admin-orders-badge-mobile" class="admin-order-notification-badge" style="display:none;"></span></a>
-                            <a href="#" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item" data-section="admin-personalize">Personalizar Sitio</a>
-                            <a href="#" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item" data-section="admin-product-stats">Estadísticas Prod.</a>
-                            <a href="#" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item" data-section="admin-analytics">Analíticas Ventas</a>
-                            <a href="#" class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item" data-section="admin-customers">Clientes</a>
+                        <a href="#"
+                            class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item"
+                            data-section="contact">Contacto</a>
+                        <a href="#"
+                            class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item"
+                            data-section="policies">Políticas</a>
+                        <a href="#"
+                            class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item"
+                            data-section="faq">FAQ</a>
+                        
+                        <div id="admin-menu-mobile-container" class="pt-2 border-t border-gray-700 mt-2"
+                            style="display: none;">
+                            <span
+                                class="block px-3 pt-2 pb-1 text-xs font-semibold text-gray-400 uppercase">Administración</span>
+                            <a href="#"
+                                class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item"
+                                data-section="admin-products">Gestionar Productos</a>
+                            <a href="#"
+                                class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item"
+                                data-section="admin-personalize">Personalizar Sitio</a>
+                            <a href="#"
+                                class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item"
+                                data-section="admin-orders">Pedidos <span id="admin-orders-badge-mobile" class="admin-order-notification-badge" style="display:none;"></span></a>
+                            <a href="#"
+                                class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item"
+                                data-section="admin-product-stats">Estadísticas Prod.</a>
+                            <a href="#"
+                                class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item"
+                                data-section="admin-analytics">Analíticas</a>
+                            <a href="#"
+                                class="block px-3 py-2 rounded-md text-base font-medium hover:bg-gray-700 admin-nav-item"
+                                data-section="admin-customers">Clientes</a>
                         </div>
-                        <button id="logoutButtonMobile" class="w-full text-left block px-3 py-2 rounded-md text-base font-medium btn btn-danger mt-3">Cerrar Sesión</button>
+                        <button id="logoutButtonMobile"
+                            class="w-full text-left block px-3 py-2 rounded-md text-base font-medium btn btn-danger mt-3">Cerrar
+                            Sesión</button>
                     </div>
                 </div>
             </header>
 
             <!-- CONTENIDO DE LA PÁGINA (Home, Productos, Carrito, etc.) -->
             <main class="container mx-auto mt-6 mb-8 p-4 sm:p-6" id="page-content">
-                
+
                 <!-- SECCIÓN HOME -->
                 <div id="home-section" style="display: none;">
-                    <!-- Contenido de home-section -->
+                    <div class="promo-banner fade-in">
+                        <i class="fas fa-tools text-4xl mb-4 opacity-80"></i>
+                        <h3 id="main-promo-title">¡Herramientas Profesionales, Precios Increíbles!</h3>
+                        <p id="main-promo-text">Equipa tu taller o proyecto con la mejor calidad. Descubre nuestras
+                            ofertas exclusivas de temporada en Ferremax.</p>
+                        <button class="cta-button admin-nav-item btn btn-primary" data-section="products">
+                            <i class="fas fa-tags mr-2"></i> Ver Ofertas Ahora
+                        </button>
+                    </div>
+
+                    <h2 id="main-welcome-title" class="text-3xl font-semibold text-gray-800 mb-6 text-center">
+                        Bienvenido a Ferremax</h2>
+                    <p class="text-gray-600 mb-8 text-center max-w-3xl mx-auto">Desde 1999, Ferretería Ferremax ha
+                        sido un pilar en la industria de la construcción. Fundada por la familia Rodríguez, nuestra
+                        empresa ha crecido de una pequeña tienda local a un referente en calidad y servicio en la
+                        región. Nuestro compromiso es ofrecer productos de alta calidad y un servicio excepcional.</p>
+                    
+                    <section id="new-carousel-section" class="max-w-4xl mx-auto my-8 relative">
+                        <div id="new-carousel-container" class="relative overflow-hidden rounded-lg shadow-lg bg-white">
+                            <div id="new-carousel-slides" class="flex transition-transform duration-700 ease-in-out">
+                                <!-- Slides se cargarán aquí por JS -->
+                            </div>
+                            <button id="new-prevBtn"
+                                class="absolute top-1/2 left-3 transform -translate-y-1/2 bg-black bg-opacity-30 hover:bg-opacity-60 text-white p-2 rounded-full z-10">
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+                            <button id="new-nextBtn"
+                                class="absolute top-1/2 right-3 transform -translate-y-1/2 bg-black bg-opacity-30 hover:bg-opacity-60 text-white p-2 rounded-full z-10">
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                        <div id="new-carousel-indicators" class="flex justify-center mt-4 space-x-2">
+                            <!-- Indicadores se cargarán aquí por JS -->
+                        </div>
+                    </section>
+
+                    <section id="categories-section">
+                        <h3 class="text-2xl font-semibold text-gray-800 mt-10 mb-6 text-center">Explora por Categoría
+                        </h3>
+                        <div id="category-grid-container" class="category-grid"></div>
+                    </section>
+
+                    <h3 class="text-2xl font-semibold text-gray-800 mt-10 mb-6 text-center">Productos Más Vendidos
+                    </h3>
+                    <div id="featured-products-container" class="grid grid-cols-1 md:grid-cols-3 gap-6"></div>
                 </div>
 
                 <!-- SECCIÓN PRODUCTOS -->
                 <div id="products-section" style="display: none;">
-                    <!-- Contenido de products-section -->
+                    <h2 class="text-3xl font-semibold text-gray-800 mb-6 text-center">Nuestros Productos</h2>
+                    <div id="products-display-area">
+                        <p class="col-span-full text-center text-gray-500 p-4">Cargando productos...</p>
+                    </div>
                 </div>
 
                 <!-- SECCIÓN CARRITO -->
                 <div id="cart-section" style="display: none;">
-                     <!-- Contenido de cart-section -->
-                </div>
-                
-                <!-- SECCIÓN HISTORIAL DE PEDIDOS -->
-                <div id="order-history-section" style="display: none;">
-                    <h2 class="text-3xl font-semibold text-gray-800 mb-6 text-center">Mi Historial de Pedidos</h2>
-                    <div id="order-history-message" class="message mb-4"></div>
-                    <div id="order-history-list-container" class="overflow-x-auto bg-white rounded-lg shadow">
-                        <p class="p-4 text-center text-gray-500">Cargando historial de pedidos...</p>
-                    </div>
-                    <div id="order-detail-view-container" class="mt-8 p-6 bg-white rounded-lg shadow" style="display:none;">
-                        <!-- Detalles del pedido -->
+                    <h2 class="text-3xl font-semibold text-gray-800 mb-6 text-center">Tu Carrito de Compras</h2>
+                    <div class="max-w-4xl mx-auto">
+                        <div id="cart-message" class="message mb-4"></div>
+                        <div id="cart-items-container" class="bg-white p-4 sm:p-6 rounded-lg shadow-md mb-6">
+                            <p class="text-center text-gray-500 py-4">Tu carrito está vacío.</p>
+                        </div>
+                        <div id="cart-summary-and-checkout" class="bg-white p-4 sm:p-6 rounded-lg shadow-md"
+                            style="display: none;">
+                            <h3 class="text-xl font-semibold text-gray-800 mb-4 text-right">Resumen del Pedido</h3>
+                            <div class="text-right space-y-2 mb-6">
+                                <p class="text-lg text-gray-700">Subtotal: <span id="cart-subtotal"
+                                        class="font-bold">$0</span></p>
+                                <p class="text-2xl font-bold text-gray-900 border-t pt-2">Total: <span id="cart-total"
+                                        class="font-bold">$0</span></p>
+                            </div>
+                            <div id="payment-button-container" class="mt-4 min-h-[50px] relative">
+                                <!-- Botones de pago se insertarán aquí por JS -->
+                            </div>
+                            <div id="payment-result-message" class="message mt-2 text-center"></div>
+
+                        </div>
+                        <div class="text-center mt-6">
+                            <button class="btn btn-gray admin-nav-item" data-section="products">
+                                <i class="fas fa-arrow-left mr-2"></i> Seguir Comprando
+                            </button>
+                        </div>
                     </div>
                 </div>
 
                 <!-- SECCIÓN CONTACTO -->
                 <div id="contact-section" style="display: none;">
-                    <!-- Contenido de contact-section -->
+                    <h2 class="text-3xl font-semibold text-gray-800 mb-6 text-center">Contáctanos</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+                        <form id="contactForm" class="bg-white p-8 rounded-lg shadow-md">
+                            <div id="contact-message-response" class="message mb-4"></div>
+                            <div class="mb-4">
+                                <label for="contact-name"
+                                    class="block text-gray-700 text-sm font-bold mb-2">Nombre</label>
+                                <input type="text" id="contact-name" name="name"
+                                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                    required>
+                            </div>
+                            <div class="mb-4">
+                                <label for="contact-email"
+                                    class="block text-gray-700 text-sm font-bold mb-2">Correo</label>
+                                <input type="email" id="contact-email" name="email"
+                                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                    required>
+                            </div>
+                            <div class="mb-4">
+                                <label for="contact-subject"
+                                    class="block text-gray-700 text-sm font-bold mb-2">Asunto</label>
+                                <input type="text" id="contact-subject" name="subject"
+                                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                    required>
+                            </div>
+                            <div class="mb-6">
+                                <label for="contact-message"
+                                    class="block text-gray-700 text-sm font-bold mb-2">Mensaje</label>
+                                <textarea id="contact-message" name="message" rows="4"
+                                    class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+                                    required></textarea>
+                            </div>
+                            <button type="submit" id="contactSubmitButton" class="btn btn-primary btn-full">Enviar
+                                Mensaje</button>
+                        </form>
+                        <div class="bg-white p-8 rounded-lg shadow-md">
+                            <h3 class="text-xl font-semibold text-gray-800 mb-6">Nuestra Información</h3>
+                            <div id="contact-info-details">
+                                <div class="contact-info-item">
+                                    <div class="contact-info-icon"><i class="fas fa-map-marker-alt"></i></div>
+                                    <div class="contact-info-text">
+                                        <h4>Dirección</h4>
+                                        <p id="contact-address">[Dirección no disponible]</p>
+                                    </div>
+                                </div>
+                                <div class="contact-info-item">
+                                    <div class="contact-info-icon"><i class="fas fa-phone-alt"></i></div>
+                                    <div class="contact-info-text">
+                                        <h4>Teléfono</h4>
+                                        <p id="contact-phone">[Teléfono no disponible]</p>
+                                    </div>
+                                </div>
+                                <div class="contact-info-item">
+                                    <div class="contact-info-icon"><i class="fas fa-envelope"></i></div>
+                                    <div class="contact-info-text">
+                                        <h4>Correo</h4>
+                                        <p id="contact-email-info">[Correo no disponible]</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-8 social-links" id="social-links-container">
+                                <h4 class="text-lg font-semibold text-gray-800 mb-4">Síguenos</h4>
+                                <p class="text-sm text-gray-500">[Redes sociales no configuradas]</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- SECCIÓN POLÍTICAS -->
                 <div id="policies-section" style="display: none;">
-                     <!-- Contenido de policies-section -->
+                    <h2 class="text-3xl font-semibold text-gray-800 mb-6 text-center">Políticas de la Empresa</h2>
+                    <div class="space-y-6">
+                        <div class="policy-item">
+                            <h3>Política de Privacidad</h3>
+                            <p>En Ferretería Ferremax, nos tomamos muy en serio la privacidad de nuestros clientes.
+                                Toda la información personal que recopilamos es utilizada exclusivamente para
+                                brindarte el mejor servicio posible y no será compartida con terceros sin tu
+                                consentimiento. Nos comprometemos a proteger tus datos personales y a cumplir con las
+                                leyes de protección de datos vigentes.</p>
+                        </div>
+                        <div class="policy-item">
+                            <h3>Política de Devoluciones</h3>
+                            <p>Ofrecemos un período de 30 días para devoluciones en productos defectuosos o no
+                                satisfactorios. Para iniciar una devolución, contáctanos a través de nuestro
+                                formulario de contacto y te proporcionaremos las instrucciones necesarias. Los
+                                productos deben estar en su estado original y con el embalaje completo para ser
+                                aceptados.</p>
+                        </div>
+                        <div class="policy-item">
+                            <h3>Política de Envío</h3>
+                            <p>Realizamos envíos a nivel nacional con costos adicionales según la ubicación. Los
+                                tiempos de entrega varían entre 3 y 7 días hábiles, dependiendo del destino. Los
+                                costos de envío serán calculados al momento de la compra y se añadirán al total del
+                                pedido. Si hay algún retraso en el envío, te informaremos lo antes posible.</p>
+                        </div>
+                        <div class="policy-item">
+                            <h3>Política de Seguridad</h3>
+                            <p>Utilizamos tecnología de encriptación avanzada para proteger tus datos personales y de
+                                pago durante las transacciones. Implementamos medidas de seguridad para evitar
+                                accesos no autorizados y garantizar la integridad de tu información. Si tienes alguna
+                                duda sobre nuestras medidas de seguridad, no dudes en contactarnos.</p>
+                        </div>
+                        <div class="policy-item">
+                            <h3>Política de Atención al Cliente</h3>
+                            <p>Nos comprometemos a ofrecer un excelente servicio al cliente. Si tienes preguntas o
+                                inquietudes, nuestro equipo de atención al cliente está disponible para asistirte.
+                                Puedes contactarnos a través del formulario de contacto en nuestra página o por correo
+                                electrónico. Responderemos a tus consultas en un plazo de 24 horas hábiles.</p>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- SECCIÓN FAQ -->
                 <div id="faq-section" style="display: none;">
-                    <!-- Contenido de faq-section -->
+                    <h2 class="text-3xl font-bold text-gray-800 mb-10 text-center">Preguntas Frecuentes</h2>
+                    <div class="max-w-3xl mx-auto" id="faq-accordion">
+                        <div class="faq-item">
+                            <div class="faq-question">
+                                <span>¿Cuáles son los métodos de pago aceptados?</span>
+                                <i class="fas fa-chevron-down faq-icon"></i>
+                            </div>
+                            <div class="faq-answer">
+                                <p>Actualmente aceptamos pagos a través de la pasarela Wompi, la cual permite usar
+                                    tarjetas de crédito, débito (PSE), Nequi, Bancolombia a la mano, y efectivo en
+                                    puntos autorizados. También ofrecemos Pago Contra Entrega.</p>
+                            </div>
+                        </div>
+                        <div class="faq-item">
+                            <div class="faq-question">
+                                <span>¿Cuánto tiempo tarda el envío?</span>
+                                <i class="fas fa-chevron-down faq-icon"></i>
+                            </div>
+                            <div class="faq-answer">
+                                <p>Los tiempos de entrega varían según tu ubicación, generalmente entre 3 y 7 días
+                                    hábiles para envíos nacionales en Colombia.</p>
+                            </div>
+                        </div>
+                        <div class="faq-item">
+                            <div class="faq-question">
+                                <span>¿Puedo devolver un producto?</span>
+                                <i class="fas fa-chevron-down faq-icon"></i>
+                            </div>
+                            <div class="faq-answer">
+                                <p>Sí, tienes 30 días para devoluciones si el producto está defectuoso o no cumple
+                                    tus expectativas. Debe estar en su estado original. Contáctanos para iniciar el
+                                    proceso.</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                
+
                 <!-- SECCIÓN ADMIN (Contenedor General) -->
                 <div id="admin-section-container" style="display: none;" class="mt-8">
-                    <!-- SECCIÓN ADMIN PRODUCTOS -->
+
                     <div id="admin-products-section" style="display: none;">
-                         <!-- Contenido de admin-products-section -->
+                        <h2 class="text-3xl font-semibold text-gray-800 mb-6">Panel de Administración - Productos</h2>
+                        <div id="admin-add-edit-product-form-container" style="display: none;" class="mb-8">
+                            <h3 id="admin-form-title" class="text-xl font-semibold text-gray-800 mb-4">Añadir/Editar
+                                Producto</h3>
+                            <form id="admin-product-form">
+                                <input type="hidden" id="admin-product-id" name="productId">
+                                <div id="admin-product-form-message" class="message mb-4"></div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div><label for="admin-product-name">Nombre (*)</label><input type="text"
+                                            id="admin-product-name" name="Nombre" required></div>
+                                    <div><label for="admin-product-brand">Marca (*)</label><input type="text"
+                                            id="admin-product-brand" name="Marca" required></div>
+                                    <div><label for="admin-product-price">Precio (*)</label><input type="number"
+                                            id="admin-product-price" name="precio_unitario" required step="0.01"
+                                            min="0"></div>
+                                    <div><label for="admin-product-quantity">Cantidad (*)</label><input type="number"
+                                            id="admin-product-quantity" name="cantidad" required step="1" min="0">
+                                    </div>
+                                    <div class="md:col-span-2"><label
+                                            for="admin-product-description">Descripción</label><textarea
+                                            id="admin-product-description" name="Descripcion"></textarea></div>
+                                    <div><label for="admin-product-category">Categoría</label><select
+                                            id="admin-product-category" name="ID_Categoria">
+                                            <option value="">-- Selecciona --</option>
+                                        </select></div>
+                                    <div><label for="admin-product-barcode">Cód. Barras</label><input type="text"
+                                            id="admin-product-barcode" name="Codigo_Barras"></div>
+                                    <div class="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+                                        <div><label for="admin-product-image-url">URL Imagen Principal</label><input
+                                                type="text" id="admin-product-image-url" name="imagen_url"
+                                                placeholder="https://ejemplo.com/imagen_principal.jpg">
+                                            <p class="text-xs text-gray-500 mt-1">URL completa de la imagen principal.
+                                            </p>
+                                        </div>
+                                        <div><label for="admin-product-image-url-2">URL Imagen 2
+                                                (Opcional)</label><input type="text" id="admin-product-image-url-2"
+                                                name="imagen_url_2"
+                                                placeholder="https://ejemplo.com/imagen_2.jpg">
+                                        </div>
+                                        <div><label for="admin-product-image-url-3">URL Imagen 3
+                                                (Opcional)</label><input type="text" id="admin-product-image-url-3"
+                                                name="imagen_url_3"
+                                                placeholder="https://ejemplo.com/imagen_3.jpg">
+                                        </div>
+                                        <div><label for="admin-product-image-url-4">URL Imagen 4
+                                                (Opcional)</label><input type="text" id="admin-product-image-url-4"
+                                                name="imagen_url_4"
+                                                placeholder="https://ejemplo.com/imagen_4.jpg">
+                                        </div>
+                                        <div class="sm:col-span-2"><label for="admin-product-image-url-5">URL Imagen 5
+                                                (Opcional)</label><input type="text" id="admin-product-image-url-5"
+                                                name="imagen_url_5"
+                                                placeholder="https://ejemplo.com/imagen_5.jpg">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-buttons">
+                                    <button type="button" id="admin-cancel-edit-product" class="btn btn-gray">Cancelar</button>
+                                    <button type="submit" id="admin-save-product-button" class="btn btn-secondary">Guardar</button>
+                                </div>
+                            </form>
+                        </div>
+                        <div id="admin-product-list-container">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-xl font-semibold text-gray-800">Gestionar Productos</h3>
+                                <button id="add-product-button" class="btn btn-secondary">
+                                    <i class="fas fa-plus mr-2"></i>Añadir Producto
+                                </button>
+                            </div>
+                            <div id="admin-products-message" class="message mb-4"></div>
+                            <div id="admin-products-table-container"
+                                class="overflow-x-auto bg-white rounded-lg shadow">
+                                <p class="p-4 text-center text-gray-500">Cargando productos...</p>
+                            </div>
+                        </div>
                     </div>
-                    <!-- SECCIÓN ADMIN PERSONALIZAR -->
+
                     <div id="admin-personalize-section" style="display: none;">
-                        <!-- Contenido de admin-personalize-section -->
+                        <h2 class="text-3xl font-semibold text-gray-800 mb-6">Panel de Administración - Personalizar
+                            Sitio</h2>
+                        <div id="admin-personalize-message" class="message mb-4"></div>
+                        <form id="personalize-form">
+                            <div class="bg-white p-6 rounded-lg shadow-md space-y-6 border border-gray-200 mb-8">
+                                <h3 class="text-xl font-semibold text-gray-700 mb-4 border-b pb-2">Colores
+                                    Principales</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                                    <div class="color-input-group"><label for="setting-colorPrimary"
+                                            class="mr-2">Primario:</label><input type="color" id="setting-colorPrimary"
+                                            name="colorPrimary"></div>
+                                    <div class="color-input-group"><label for="setting-colorSecondary"
+                                            class="mr-2">Secundario:</label><input type="color"
+                                            id="setting-colorSecondary" name="colorSecondary"></div>
+                                    <div class="color-input-group"><label for="setting-colorAccent"
+                                            class="mr-2">Acento:</label><input type="color" id="setting-colorAccent"
+                                            name="colorAccent"></div>
+                                </div>
+                                <div class="mt-6 text-right"><button type="button" id="save-colors-button"
+                                        class="btn btn-primary">Guardar Colores</button></div>
+                            </div>
+                            <div class="bg-white p-6 rounded-lg shadow-md space-y-6 border border-gray-200 mb-8">
+                                <h3 class="text-xl font-semibold text-gray-700 mb-4 border-b pb-2">Textos Clave (Home)
+                                </h3>
+                                <div class="space-y-4">
+                                    <div><label for="setting-welcomeTitle">Título Bienvenida</label><input type="text"
+                                            id="setting-welcomeTitle" name="welcomeTitle"></div>
+                                    <div><label for="setting-promoBannerTitle">Título Banner</label><input type="text"
+                                            id="setting-promoBannerTitle" name="promoBannerTitle"></div>
+                                    <div><label for="setting-promoBannerText">Texto Banner</label><textarea
+                                            id="setting-promoBannerText" name="promoBannerText" rows="3"></textarea>
+                                    </div>
+                                </div>
+                                <div class="mt-6 text-right"><button type="button" id="save-texts-button"
+                                        class="btn btn-primary">Guardar Textos</button></div>
+                            </div>
+                            <div class="bg-white p-6 rounded-lg shadow-md space-y-6 border border-gray-200">
+                                <h3 class="text-xl font-semibold text-gray-700 mb-4 border-b pb-2">Información de
+                                    Contacto y Redes</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div><label for="setting-contactAddress">Dirección</label><input type="text"
+                                            id="setting-contactAddress" name="contactAddress"></div>
+                                    <div><label for="setting-contactPhone">Teléfono</label><input type="text"
+                                            id="setting-contactPhone" name="contactPhone"></div>
+                                    <div class="md:col-span-2"><label for="setting-contactEmail">Correo
+                                            Electrónico</label><input type="email" id="setting-contactEmail"
+                                            name="contactEmail"></div>
+                                    <div><label for="setting-socialFacebook">URL Facebook
+                                            (Completa)</label><input type="url" id="setting-socialFacebook"
+                                            name="socialFacebook" placeholder="https://facebook.com/tu-pagina"></div>
+                                    <div><label for="setting-socialTwitter">URL Twitter
+                                            (Completa)</label><input type="url" id="setting-socialTwitter"
+                                            name="socialTwitter" placeholder="https://twitter.com/tu-usuario"></div>
+                                    <div><label for="setting-socialInstagram">URL Instagram
+                                            (Completa)</label><input type="url" id="setting-socialInstagram"
+                                            name="socialInstagram" placeholder="https://instagram.com/tu-usuario"></div>
+                                    <div><label for="setting-socialYoutube">URL YouTube
+                                            (Completa)</label><input type="url" id="setting-socialYoutube"
+                                            name="socialYoutube" placeholder="https://youtube.com/tu-canal"></div>
+                                </div>
+                                <div class="mt-6 text-right"><button type="button" id="save-contact-social-button"
+                                        class="btn btn-primary">Guardar Contacto/Redes</button></div>
+                            </div>
+                        </form>
                     </div>
-                    <!-- SECCIÓN ADMIN PEDIDOS -->
+
                     <div id="admin-orders-section" style="display: none;">
-                        <!-- Contenido de admin-orders-section -->
+                        <h2 class="text-3xl font-semibold text-gray-800 mb-6">Gestión de Pedidos</h2>
+                        <div id="admin-orders-message" class="message mb-4"></div>
+                        <div id="admin-orders-list-container" class="overflow-x-auto bg-white rounded-lg shadow">
+                            <p class="p-4 text-center text-gray-500">Cargando pedidos...</p>
+                        </div>
+                        <div id="admin-order-detail-container" style="display:none;" class="mt-8 p-6 bg-white rounded-lg shadow">
+                        </div>
                     </div>
-                    <!-- SECCIÓN ADMIN ESTADÍSTICAS DE PRODUCTO -->
+                    
                     <div id="admin-product-stats-section" style="display: none;">
-                         <!-- Contenido de admin-product-stats-section -->
+                        <h2 class="text-3xl font-semibold text-gray-800 mb-6">Estadísticas de Productos</h2>
+                        <div id="admin-product-views-message" class="message mb-4"></div>
+                        <h3 class="text-xl font-semibold text-gray-700 mb-4">Productos Más Vistos</h3>
+                        <div id="product-views-container" class="overflow-x-auto bg-white rounded-lg shadow mb-8">
+                            <p class="p-4 text-center text-gray-500">Cargando estadísticas de vistas...</p>
+                        </div>
                     </div>
-                     <!-- SECCIÓN ADMIN ANALÍTICAS -->
+                    
                     <div id="admin-analytics-section" style="display: none;">
-                         <!-- Contenido de admin-analytics-section -->
+                        <h2 class="text-3xl font-semibold text-gray-800 mb-6">Analíticas de Ventas</h2>
+                        <div id="admin-analytics-message" class="message mb-4"></div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="bg-white p-4 rounded-lg shadow">
+                                <h3 class="text-xl font-semibold mb-2">Ventas Diarias (Últimos 30 días)</h3>
+                                <canvas id="dailySalesChart"></canvas>
+                            </div>
+                            <div class="bg-white p-4 rounded-lg shadow">
+                                <h3 class="text-xl font-semibold mb-2">Top 10 Productos Vendidos</h3>
+                                <canvas id="topProductsChart"></canvas>
+                            </div>
+                        </div>
                     </div>
-                    <!-- SECCIÓN ADMIN CLIENTES -->
+                    
                     <div id="admin-customers-section" style="display: none;">
-                        <!-- Contenido de admin-customers-section -->
+                        <h2 class="text-3xl font-semibold text-gray-800 mb-6">Gestión de Clientes</h2>
+                        <div id="admin-customers-message" class="message mb-4"></div>
+                        <div id="admin-customers-list-container" class="overflow-x-auto bg-white rounded-lg shadow">
+                            <p class="p-4 text-center text-gray-500">Cargando clientes...</p>
+                        </div>
                     </div>
-                </div>
+
+                </div> <!-- Fin de #admin-section-container -->
             </main>
-        </section>
-    </div>
+        </section> <!-- Fin de #main-content -->
+    </div> <!-- Fin de .flex-grow -->
 
     <!-- MODAL DE IMAGEN -->
     <div id="imageModal" class="image-modal" style="display: none;" onclick="closeImageModalOnClick(event)">
         <span class="image-modal-close" onclick="closeImageModal()">×</span>
         <img class="image-modal-content" id="modalImage">
     </div>
-    
+
     <!-- FOOTER -->
     <footer class="bg-gray-700 text-white text-center py-4 mt-auto">
         <div class="container mx-auto px-4">
@@ -249,9 +679,6 @@
         </div>
     </footer>
 
-    <!-- Enlace a tu archivo JavaScript personalizado -->
     <script src="script.js"></script>
-    <!-- Script del carrusel si lo tienes separado y no está en script.js -->
-    <!-- <script src="carousel.js"></script> --> 
 </body>
 </html>
