@@ -163,6 +163,16 @@ const checkUser = async (req, res, next) => {
     }
 };
 
+// --- ADAPTAR FLUJO DE COMPRA PARA ASOCIAR VENTA AL CLIENTE SI EL USUARIO ESTÁ LOGUEADO ---
+// Este helper busca o crea el cliente y retorna su ID
+async function getOrCreateClienteId({ username, email }) {
+    // Buscar cliente por email
+    const [clientes] = await dbPool.query('SELECT ID_Cliente FROM cliente WHERE Email = ? LIMIT 1', [email]);
+    if (clientes.length > 0) return clientes[0].ID_Cliente;
+    // Si no existe, crear
+    const [result] = await dbPool.query('INSERT INTO cliente (Nombre, Apellido, Email) VALUES (?, ?, ?)', [username || '', '', email]);
+    return result.insertId;
+}
 
 // --- RUTAS ---
 // ... (rutas existentes: /api/config, /register, /login, /api/productos, etc.) ...
@@ -270,6 +280,17 @@ app.post('/register', async (req, res) => {
             [username, email, hashedPassword, 'cliente'] // Default role 'cliente'
         );
         console.log(`\t<-- Usuario registrado: ${username} (ID: ${result.insertId})`);
+
+        // NUEVO: Crear cliente si no existe
+        const [existingCliente] = await dbPool.query('SELECT ID_Cliente FROM cliente WHERE Email = ? LIMIT 1', [email]);
+        if (existingCliente.length === 0) {
+            await dbPool.query(
+                'INSERT INTO cliente (Nombre, Apellido, Email) VALUES (?, ?, ?)',
+                [username || '', '', email]
+            );
+            console.log(`\t<-- Cliente creado para usuario: ${username} (${email})`);
+        }
+
         res.status(201).json({ success: true, message: 'Usuario registrado exitosamente.' });
     } catch (error) {
         console.error('!!! Error en /register:', error);
@@ -436,6 +457,7 @@ app.post('/api/wompi/temp-order', async (req, res) => {
     res.status(200).json({ success: true, message: 'Orden temporal guardada.' });
 });
 
+// --- ADAPTAR FLUJO WOMPI WEBHOOK PARA ASOCIAR CLIENTE ---
 app.post('/api/wompi/webhook', async (req, res) => {
     console.log("--> POST /api/wompi/webhook (Notificación Wompi recibida)");
     const signatureReceived = req.body.signature?.checksum;
@@ -507,7 +529,19 @@ app.post('/api/wompi/webhook', async (req, res) => {
                 await connection.rollback();
                 console.error(`\t\t!!! Rollback DB ejecutado (actualización de stock fallida) para Ref: ${transactionReference} debido a: ${failureMessage}`);
             } else {
-                // 2. Crear el pedido en la tabla `pedidos`
+                // 2. Asociar cliente si el usuario está logueado o por email de wompi
+                let clienteId = null;
+                if (orderDetails.userId) {
+                    const [usuarios] = await dbPool.query('SELECT username, email FROM usuarios WHERE id = ?', [orderDetails.userId]);
+                    if (usuarios.length > 0) {
+                        clienteId = await getOrCreateClienteId({ username: usuarios[0].username, email: usuarios[0].email });
+                    }
+                } else {
+                    // Si no está logueado, buscar/crear por el email de wompi
+                    clienteId = await getOrCreateClienteId({ username: orderDetails.customerData?.fullName || 'Cliente Wompi', email: eventData.customer_email });
+                }
+
+                // 3. Crear el pedido en la tabla `pedidos`
                 console.log("\t\tStock actualizado correctamente.");
                 const tempOrderData = wompiTempOrders[transactionReference]; // Re-obtener por si acaso
                 const userId = tempOrderData?.userId || null; // Si el usuario estaba logueado
@@ -519,18 +553,19 @@ app.post('/api/wompi/webhook', async (req, res) => {
 
 
                 const [pedidoResult] = await connection.query(
-                    `INSERT INTO pedidos (ID_Usuario, Total_Pedido, Estado_Pedido, Metodo_Pago, Referencia_Pago, Nombre_Cliente_Envio, Email_Cliente_Envio, Telefono_Cliente_Envio, Direccion_Envio, Departamento_Envio, Ciudad_Envio, Punto_Referencia_Envio, Fecha_Pedido)
-                     VALUES (?, ?, 'Pagado', 'Wompi', ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+                    `INSERT INTO pedidos (ID_Usuario, Total_Pedido, Estado_Pedido, Metodo_Pago, Referencia_Pago, Nombre_Cliente_Envio, Email_Cliente_Envio, Telefono_Cliente_Envio, Direccion_Envio, Departamento_Envio, Ciudad_Envio, Punto_Referencia_Envio, Fecha_Pedido, ID_Cliente)
+                     VALUES (?, ?, 'Pagado', 'Wompi', ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
                     [userId, orderDetails.total, transactionReference,
                      nombreClienteEnvio, emailClienteEnvio, telefonoClienteEnvio, direccionEnvio,
                      eventData.shipping_address?.region || null, // Departamento
                      eventData.shipping_address?.city || null,   // Ciudad
-                     eventData.shipping_address?.address_line_2 || null // Punto de referencia
+                     eventData.shipping_address?.address_line_2 || null, // Punto de referencia
+                     clienteId
                     ]
                 );
                 const pedidoId = pedidoResult.insertId;
 
-                // 3. Insertar detalles del pedido en `detalles_pedido`
+                // 4. Insertar detalles del pedido en `detalles_pedido`
                 const detallePromises = orderDetails.items.map(item => {
                     return connection.query(
                         'INSERT INTO detalles_pedido (ID_Pedido, ID_Producto, Cantidad, Precio_Unitario_Compra) VALUES (?, ?, ?, ?)',
@@ -565,7 +600,7 @@ app.post('/api/wompi/webhook', async (req, res) => {
 });
 
 
-// --- RUTAS DE PEDIDO CONTRA ENTREGA (ACTUALIZADO) ---
+// --- RUTAS DE PEDIDO CONTRA ENTREGA (ADAPTADO PARA ASOCIAR CLIENTE) ---
 app.post('/api/orders/cash-on-delivery', async (req, res) => {
     console.log("--> POST /api/orders/cash-on-delivery");
     const { cart, customerInfo } = req.body;
@@ -573,7 +608,7 @@ app.post('/api/orders/cash-on-delivery', async (req, res) => {
     // Validación de datos de entrada
     if (!cart || cart.length === 0 || !customerInfo ||
         !customerInfo.name || !customerInfo.phone || !customerInfo.address ||
-        !customerInfo.department || !customerInfo.city || // Nuevos campos obligatorios
+        !customerInfo.department || !customerInfo.city ||
         !customerInfo.email) {
         return res.status(400).json({ success: false, message: "Faltan datos del carrito o del cliente (incluyendo departamento y ciudad)." });
     }
@@ -587,43 +622,56 @@ app.post('/api/orders/cash-on-delivery', async (req, res) => {
         // 1. Verificar stock y calcular total (usando precios de la DB para seguridad)
         let totalPedido = 0;
         for (const item of cart) {
-            // FOR UPDATE bloquea la fila para evitar race conditions con el stock
             const [productDB] = await connection.query('SELECT Nombre, precio_unitario, cantidad FROM producto WHERE ID_Producto = ? FOR UPDATE', [item.productId]);
             if (productDB.length === 0) throw new Error(`Producto ID ${item.productId} no encontrado.`);
             if (productDB[0].cantidad < item.quantity) {
                 throw new Error(`Stock insuficiente para ${productDB[0].Nombre}. Disponible: ${productDB[0].cantidad}, Solicitado: ${item.quantity}. Por favor, ajusta tu carrito.`);
             }
-            item.price = productDB[0].precio_unitario; // Usar precio de DB
+            item.price = productDB[0].precio_unitario;
             totalPedido += item.price * item.quantity;
         }
 
-        // 2. Crear el pedido
+        // 2. Asociar cliente si el usuario está logueado
+        let clienteId = null;
+        if (customerInfo.userId) {
+            // Buscar datos del usuario
+            const [usuarios] = await dbPool.query('SELECT username, email FROM usuarios WHERE id = ?', [customerInfo.userId]);
+            if (usuarios.length > 0) {
+                clienteId = await getOrCreateClienteId({ username: usuarios[0].username, email: usuarios[0].email });
+            }
+        } else {
+            // Si no está logueado, buscar/crear por el email del formulario
+            clienteId = await getOrCreateClienteId({ username: customerInfo.name, email: customerInfo.email });
+        }
+
+        // 3. Crear el pedido
         const [pedidoResult] = await connection.query(
             `INSERT INTO pedidos (
                 ID_Usuario, Total_Pedido, Estado_Pedido, Metodo_Pago, 
                 Nombre_Cliente_Envio, Direccion_Envio, 
-                Departamento_Envio, Ciudad_Envio, Punto_Referencia_Envio, /* Nuevo */
-                Telefono_Cliente_Envio, Email_Cliente_Envio, Fecha_Pedido
-             ) VALUES (?, ?, 'Pendiente de Confirmacion', 'ContraEntrega', ?, ?, ?, ?, ?, ?, ?, NOW())`,
+                Departamento_Envio, Ciudad_Envio, Punto_Referencia_Envio,
+                Telefono_Cliente_Envio, Email_Cliente_Envio, Fecha_Pedido,
+                ID_Cliente
+             ) VALUES (?, ?, 'Pendiente de Confirmacion', 'ContraEntrega', ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
             [
-                customerInfo.userId || null, // Si el usuario está logueado
+                customerInfo.userId || null,
                 totalPedido,
                 customerInfo.name, customerInfo.address,
-                customerInfo.department, customerInfo.city, customerInfo.referencePoint || null, // Nuevo
-                customerInfo.phone, customerInfo.email
+                customerInfo.department, customerInfo.city, customerInfo.referencePoint || null,
+                customerInfo.phone, customerInfo.email,
+                clienteId
             ]
         );
         const pedidoId = pedidoResult.insertId;
         console.log(`\tPedido contra entrega ID ${pedidoId} creado con dirección completa.`);
 
-        // 3. Insertar detalles y actualizar stock
+        // 4. Insertar detalles y actualizar stock
         for (const item of cart) {
             await connection.query(
                 'INSERT INTO detalles_pedido (ID_Pedido, ID_Producto, Cantidad, Precio_Unitario_Compra) VALUES (?, ?, ?, ?)',
                 [pedidoId, item.productId, item.quantity, item.price]
             );
-            // Actualizar stock
-            await connection.query( // Ya se hizo lock con FOR UPDATE, seguro actualizar
+            await connection.query(
                 'UPDATE producto SET cantidad = cantidad - ? WHERE ID_Producto = ?',
                 [item.quantity, item.productId]
             );
@@ -633,16 +681,14 @@ app.post('/api/orders/cash-on-delivery', async (req, res) => {
         console.log("\tCommit: Pedido contra entrega procesado exitosamente.");
         res.status(201).json({ success: true, message: "Pedido contra entrega recibido exitosamente.", orderId: pedidoId });
     } catch (error) {
-        if (connection) await connection.rollback(); // Rollback en caso de error
+        if (connection) await connection.rollback();
         console.error("!!! Error procesando pedido contra entrega:", error);
-        // Devolver 409 (Conflict) si es por stock insuficiente
         res.status(error.message.includes("Stock insuficiente") ? 409 : 500)
            .json({ success: false, message: error.message || "Error interno al procesar el pedido contra entrega." });
     } finally {
         if (connection) connection.release();
     }
 });
-
 
 // --- RUTAS DE ADMINISTRACIÓN ---
 // PRODUCTOS
