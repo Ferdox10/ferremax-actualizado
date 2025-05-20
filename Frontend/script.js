@@ -118,6 +118,117 @@ const modalImage = document.getElementById('modalImage');
 const adminOrdersBadgeDesktop = document.getElementById('admin-orders-badge-desktop');
 const adminOrdersBadgeMobile = document.getElementById('admin-orders-badge-mobile');
 
+// --- HISTORIAL DE COMPRAS ---
+const purchaseHistorySection = document.getElementById('purchase-history-section');
+const purchaseHistoryMessage = document.getElementById('purchase-history-message');
+const historyListContainer = document.getElementById('history-list-container');
+const navLinkPurchaseHistoryDesktop = document.getElementById('nav-link-purchase-history-desktop');
+const navLinkPurchaseHistoryMobile = document.getElementById('nav-link-purchase-history-mobile');
+
+function renderPurchaseHistory(orders) {
+    if (!historyListContainer) return;
+    historyListContainer.innerHTML = '';
+    if (!orders || orders.length === 0) {
+        historyListContainer.innerHTML = '<p class="text-center text-gray-500 p-4">No tienes compras registradas.</p>';
+        return;
+    }
+    orders.forEach(order => {
+        const orderDiv = document.createElement('div');
+        orderDiv.className = 'border rounded-lg p-4 bg-white shadow';
+        orderDiv.innerHTML = `
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-2">
+                <div>
+                    <span class="font-semibold">Pedido #${order.ID_Pedido}</span>
+                    <span class="ml-2 text-gray-500 text-sm">${new Date(order.Fecha_Pedido).toLocaleDateString()}</span>
+                </div>
+                <div class="mt-2 md:mt-0">
+                    <span class="text-sm font-medium">Estado:</span> <span class="inline-block px-2 py-1 rounded text-xs ${order.Estado_Pedido === 'Pagado' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}">${order.Estado_Pedido}</span>
+                    <span class="ml-4 text-sm font-medium">Total:</span> <span class="font-bold">${formatCOP(order.Total_Pedido)}</span>
+                </div>
+            </div>
+            <div class="overflow-x-auto mt-2">
+                <table class="min-w-full text-sm">
+                    <thead><tr><th class="text-left">Producto</th><th>Cantidad</th><th>Precio</th></tr></thead>
+                    <tbody>
+                        ${order.items.map(item => `
+                            <tr>
+                                <td class="py-1 flex items-center gap-2">
+                                    <img src="${item.imageUrl || 'https://placehold.co/40x40/e5e7eb/4b5563?text=NI'}" alt="${item.name}" class="w-8 h-8 object-contain rounded mr-2">
+                                    ${item.name}
+                                </td>
+                                <td class="text-center">${item.quantity}</td>
+                                <td>${formatCOP(item.pricePaid)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+            <div class="text-xs text-gray-400 mt-2">Método de pago: ${order.Metodo_Pago || 'N/A'}${order.Referencia_Pago ? ` | Ref: ${order.Referencia_Pago}` : ''}</div>
+        `;
+        historyListContainer.appendChild(orderDiv);
+    });
+}
+
+async function fetchPurchaseHistory() {
+    if (!purchaseHistorySection) return;
+    purchaseHistorySection.style.display = 'block';
+    if (purchaseHistoryMessage) purchaseHistoryMessage.style.display = 'none';
+    if (historyListContainer) historyListContainer.innerHTML = '<p class="text-center text-gray-500 p-4">Cargando historial...</p>';
+    // Obtener el userId del usuario logueado (puede estar en localStorage o variable global)
+    const user = JSON.parse(localStorage.getItem('ferremaxUser'));
+    if (!user || !user.id) {
+        renderPurchaseHistory([]);
+        if (purchaseHistoryMessage) showMessage(purchaseHistoryMessage, 'Debes iniciar sesión para ver tu historial.', true);
+        return;
+    }
+    try {
+        const response = await fetch(`${API_URL}/api/user/orders`, {
+            headers: { 'x-user-id': user.id }
+        });
+        const data = await response.json();
+        if (data.success) {
+            renderPurchaseHistory(data.orders);
+        } else {
+            renderPurchaseHistory([]);
+            if (purchaseHistoryMessage) showMessage(purchaseHistoryMessage, data.message || 'No se pudo obtener el historial.', true);
+        }
+    } catch (error) {
+        renderPurchaseHistory([]);
+        if (purchaseHistoryMessage) showMessage(purchaseHistoryMessage, 'Error al cargar el historial.', true);
+    }
+}
+
+// Mostrar sección historial y ocultar otras
+function showPurchaseHistorySection() {
+    // Oculta todas las secciones principales
+    [
+        'home-section', 'products-section', 'cart-section', 'contact-section', 'policies-section', 'faq-section', 'admin-section-container'
+    ].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+    if (purchaseHistorySection) purchaseHistorySection.style.display = 'block';
+    fetchPurchaseHistory();
+}
+
+// Mostrar/ocultar enlace de historial de compras según el usuario
+function updatePurchaseHistoryMenuVisibility() {
+    const user = JSON.parse(localStorage.getItem('ferremaxUser'));
+    const isClient = user && user.role !== 'admin';
+    if (navLinkPurchaseHistoryDesktop) navLinkPurchaseHistoryDesktop.style.display = isClient ? '' : 'none';
+    if (navLinkPurchaseHistoryMobile) navLinkPurchaseHistoryMobile.style.display = isClient ? '' : 'none';
+}
+
+// Eventos para los botones de menú
+if (navLinkPurchaseHistoryDesktop) {
+    navLinkPurchaseHistoryDesktop.addEventListener('click', function (e) {
+        e.preventDefault();
+        showPurchaseHistorySection();
+    });
+}
+if (navLinkPurchaseHistoryMobile) {
+    navLinkPurchaseHistoryMobile.addEventListener('click', function (e) {
+        e.preventDefault();
+        showPurchaseHistorySection();
+    });
+}
 
 // --- FUNCIONES UTILITARIAS ---
 function showMessage(element, message, isError = true) {
@@ -1228,7 +1339,7 @@ async function showPageSection(sectionId, detailId = null) {
     console.log(`Nav -> ${sectionId}${detailId ? ` (${detailId})` : ''}`);
     hideMessages(); // Hide general messages
 
-    const publicSections = ['home', 'products', 'contact', 'policies', 'cart', 'faq'];
+    const publicSections = ['home', 'products', 'contact', 'policies', 'cart', 'faq', 'purchase-history'];
     const adminSubSections = ['admin-products', 'admin-personalize', 'admin-orders', 'admin-product-stats', 'admin-analytics', 'admin-customers'];
     
     let needsPublicProducts = ['home', 'products', 'cart'].includes(sectionId) || (sectionId === 'products' && detailId);
@@ -1345,7 +1456,7 @@ function updateUI(isLoggedIn) {
 
     if (isLoggedIn) {
         if (loginSection) loginSection.style.display = "none";
-        if (registerSection) registerSection.style.display = "none";
+        if (registerSection) loginSection.style.display = "none";
         if (mainContent) mainContent.style.display = "block";
     } else {
         if (loginSection) loginSection.style.display = "block";
@@ -1376,6 +1487,10 @@ function updateUI(isLoggedIn) {
             console.log("Polling de pedidos detenido.");
         }
     }
+
+    // Update purchase history menu visibility
+    updatePurchaseHistoryMenuVisibility();
+
     console.log("UI Updated.");
 }
 
@@ -1782,6 +1897,8 @@ function handleLogout() {
     localStorage.removeItem("userLoggedIn");
     localStorage.removeItem("userEmail");
     localStorage.removeItem("userRole");
+    localStorage.removeItem("ferremaxUser");
+    updatePurchaseHistoryMenuVisibility(); // <-- Ocultar botón Mis Compras
     updateUI(false);
     console.log("User logged out.");
     showPageSection('login'); // Redirect to login page
@@ -1878,6 +1995,8 @@ document.addEventListener("DOMContentLoaded", async () => {
                         localStorage.setItem("userLoggedIn", "true");
                         localStorage.setItem("userEmail", email); // Store email
                         localStorage.setItem("userRole", result.user?.role || 'cliente'); // Store role
+                        localStorage.setItem("ferremaxUser", JSON.stringify(result.user)); // Store user data
+                        updatePurchaseHistoryMenuVisibility(); // <-- Mostrar botón Mis Compras si aplica
                         productsLoaded = false; await loadSiteSettings(); // Reload settings that might depend on role
                         updateUI(true); await showPageSection("home");
                     } else { showMessage(loginMessageDiv, result.message || "Error en el login.", true); }
@@ -1899,8 +2018,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 try {
                     const response = await fetch(`${API_URL}/register`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, email, password }) });
                     const result = await response.json();
-                    if (response.ok && result.success) {
-                        showMessage(registerMessageDiv, "¡Registro exitoso! Ahora puedes iniciar sesión.", false);
+                    if (response.ok && result.success) { showMessage(registerMessageDiv, "¡Registro exitoso! Ahora puedes iniciar sesión.", false);
                         setTimeout(() => { if (registerSection) registerSection.style.display = "none"; if (loginSection) loginSection.style.display = "block"; if (loginForm) loginForm.reset(); if (registerForm) registerForm.reset(); hideMessages(); }, 2500);
                     } else { showMessage(registerMessageDiv, result.message || "Error en el registro.", true); }
                 } catch (error) { console.error("Error registro fetch:", error); showMessage(registerMessageDiv, "No se pudo conectar con el servidor.", true);
