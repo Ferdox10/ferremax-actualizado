@@ -167,52 +167,60 @@ const checkUser = async (req, res, next) => {
 // --- RUTAS ---
 // ... (rutas existentes: /api/config, /register, /login, /api/productos, etc.) ...
 
-// --- NUEVA RUTA PARA HISTORIAL DE COMPRAS DEL USUARIO ---
+// --- NUEVA RUTA PARA HISTORIAL DE COMPRAS DEL USUARIO (ADAPTADA A MODELO ACTUAL) ---
 app.get('/api/user/orders', checkUser, async (req, res) => {
     const userId = req.userId; // Obtenido del middleware checkUser
-    console.log(`--> GET /api/user/orders para Usuario ID: ${userId}`);
-
     try {
-        // 1. Obtener los pedidos del usuario
-        const [pedidos] = await dbPool.query(
-            `SELECT ID_Pedido, Fecha_Pedido, Total_Pedido, Estado_Pedido, Metodo_Pago, Referencia_Pago 
-             FROM pedidos 
-             WHERE ID_Usuario = ? 
-             ORDER BY Fecha_Pedido DESC`,
-            [userId]
-        );
+        // 1. Obtener el email del usuario logueado
+        const [usuarios] = await dbPool.query('SELECT email FROM usuarios WHERE id = ?', [userId]);
+        if (!usuarios.length) return res.status(404).json({ success: false, message: 'Usuario no encontrado.' });
+        const userEmail = usuarios[0].email;
 
-        if (pedidos.length === 0) {
-            console.log(`\t<-- No se encontraron pedidos para el Usuario ID: ${userId}`);
+        // 2. Buscar el cliente asociado a ese email
+        const [clientes] = await dbPool.query('SELECT ID_Cliente FROM cliente WHERE Email = ?', [userEmail]);
+        if (!clientes.length) {
+            // No hay cliente asociado, por lo tanto no hay compras
+            return res.status(200).json({ success: true, orders: [] });
+        }
+        const clienteId = clientes[0].ID_Cliente;
+
+        // 3. Buscar las ventas de ese cliente
+        const [ventas] = await dbPool.query(
+            `SELECT ID_Venta, Fecha, Total FROM venta WHERE ID_Cliente = ? ORDER BY Fecha DESC`,
+            [clienteId]
+        );
+        if (!ventas.length) {
             return res.status(200).json({ success: true, orders: [] });
         }
 
-        // 2. Para cada pedido, obtener sus detalles y la información de los productos
+        // 4. Para cada venta, obtener los detalles y productos
         const ordersWithDetails = await Promise.all(
-            pedidos.map(async (pedido) => {
+            ventas.map(async (venta) => {
                 const [detalles] = await dbPool.query(
-                    `SELECT dp.Cantidad, dp.Precio_Unitario_Compra, 
-                            p.Nombre as ProductName, p.imagen_url as ProductImageUrl, p.ID_Producto
-                     FROM detalles_pedido dp
-                     JOIN producto p ON dp.ID_Producto = p.ID_Producto
-                     WHERE dp.ID_Pedido = ?`,
-                    [pedido.ID_Pedido]
+                    `SELECT dv.ID_Producto, p.Nombre as ProductName, p.imagen_url as ProductImageUrl, dv.Cantidad, dv.Precio_Unitario, dv.Subtotal
+                     FROM detalle_venta dv
+                     JOIN producto p ON dv.ID_Producto = p.ID_Producto
+                     WHERE dv.ID_Venta = ?`,
+                    [venta.ID_Venta]
                 );
                 return {
-                    ...pedido,
+                    ID_Pedido: venta.ID_Venta,
+                    Fecha_Pedido: venta.Fecha,
+                    Total_Pedido: venta.Total,
+                    Estado_Pedido: 'Completado', // Puedes adaptar según tu lógica
+                    Metodo_Pago: 'N/A', // Si tienes campo, cámbialo
+                    Referencia_Pago: null,
                     items: detalles.map(d => ({
                         productId: d.ID_Producto,
                         name: d.ProductName,
                         quantity: d.Cantidad,
-                        pricePaid: d.Precio_Unitario_Compra,
+                        pricePaid: d.Precio_Unitario,
                         imageUrl: d.ProductImageUrl
                     }))
                 };
             })
         );
-        console.log(`\t<-- Devolviendo ${ordersWithDetails.length} pedidos con detalles para Usuario ID: ${userId}`);
         res.status(200).json({ success: true, orders: ordersWithDetails });
-
     } catch (error) {
         console.error(`!!! Error GET /api/user/orders para Usuario ID ${userId}:`, error);
         res.status(500).json({ success: false, message: 'Error al obtener el historial de compras.' });
