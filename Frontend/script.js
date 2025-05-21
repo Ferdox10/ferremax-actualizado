@@ -1386,23 +1386,42 @@ async function showPageSection(sectionId, detailId = null) {
     let sectionToShow;
 
     if (adminSubSections.includes(sectionId)) { // If it's an admin sub-section
-        console.log(`Mostrando sección ADMIN: ${sectionId}`);
-        if (adminSectionContainer) adminSectionContainer.style.display = "block"; // Show the main admin container
-        sectionToShow = document.getElementById(`${sectionId}-section`);
-        if (sectionToShow) {
-            sectionToShow.style.display = "block";
-            // Load data specific to the admin section
-            if (sectionId === 'admin-dashboard' && adminDashboardWrapper) {
-                adminDashboardWrapper.style.display = 'flex';
-            } else if (sectionId === 'admin-products') { await loadAdminProducts(); showAdminProductList(); }
-            else if (sectionId === 'admin-personalize') { populatePersonalizeForm(); }
-            else if (sectionId === 'admin-orders') { await loadAndRenderAdminOrders(); checkNewOrders(); /* Refresh badge after viewing */ }
-            else if (sectionId === 'admin-product-stats') { await loadAndRenderProductViews(); }
-            else if (sectionId === 'admin-analytics') { await loadAndRenderAnalytics(); }
-            else if (sectionId === 'admin-customers') { await loadAndRenderAdminCustomers(); }
-        } else {
-            console.warn(`Admin section ${sectionId} not found.`);
+        // Mostrar el contenedor principal admin
+        if (adminSectionContainer) adminSectionContainer.style.display = "block";
+        // Ocultar todos los subpaneles admin
+        if (adminDashboardWrapper) adminDashboardWrapper.style.display = "none";
+        if (adminProductsSection) adminProductsSection.style.display = "none";
+        if (adminPersonalizeSection) adminPersonalizeSection.style.display = "none";
+        if (adminOrdersSection) adminOrdersSection.style.display = "none";
+        if (adminProductStatsSection) adminProductStatsSection.style.display = "none";
+        if (adminAnalyticsSection) adminAnalyticsSection.style.display = "none";
+        if (adminCustomersSection) adminCustomersSection.style.display = "none";
+        // Mostrar el panel correspondiente
+        if (sectionId === 'admin-dashboard' && adminDashboardWrapper) {
+            adminDashboardWrapper.style.display = 'flex';
+            await loadAndRenderAdminDashboard();
+        } else if (sectionId === 'admin-products' && adminProductsSection) {
+            adminProductsSection.style.display = 'block';
+            await loadAdminProducts();
+            showAdminProductList();
+        } else if (sectionId === 'admin-personalize' && adminPersonalizeSection) {
+            adminPersonalizeSection.style.display = 'block';
+            populatePersonalizeForm();
+        } else if (sectionId === 'admin-orders' && adminOrdersSection) {
+            adminOrdersSection.style.display = 'block';
+            await loadAndRenderAdminOrders();
+            checkNewOrders();
+        } else if (sectionId === 'admin-product-stats' && adminProductStatsSection) {
+            adminProductStatsSection.style.display = 'block';
+            await loadAndRenderProductViews();
+        } else if (sectionId === 'admin-analytics' && adminAnalyticsSection) {
+            adminAnalyticsSection.style.display = 'block';
+            await loadAndRenderAnalytics();
+        } else if (sectionId === 'admin-customers' && adminCustomersSection) {
+            adminCustomersSection.style.display = 'block';
+            await loadAndRenderAdminCustomers();
         }
+        return;
     } else if (publicSections.includes(sectionId)) { // If it's a public section
         if (adminSectionContainer) adminSectionContainer.style.display = "none"; // Ensure admin container is hidden
         sectionToShow = document.getElementById(`${sectionId}-section`);
@@ -1951,6 +1970,133 @@ function handleGridOrDetailClick(event) {
 }
 
 
+// --- DASHBOARD ADMIN FUNCIONAL ---
+async function loadAndRenderAdminDashboard() {
+    // Referencias a tarjetas y contenedores
+    const ventasTotalesSpan = document.querySelector('#admin-dashboard-wrapper .dashboard-card-ventas');
+    const pedidosNuevosSpan = document.querySelector('#admin-dashboard-wrapper .dashboard-card-pedidos');
+    const usuariosNuevosSpan = document.querySelector('#admin-dashboard-wrapper .dashboard-card-usuarios');
+    const visitasSpan = document.querySelector('#admin-dashboard-wrapper .dashboard-card-visitas');
+    const graficaVentas = document.getElementById('dashboardSalesChart');
+    const tablaPedidos = document.querySelector('#admin-dashboard-wrapper .dashboard-recent-orders-tbody');
+    const verTodosBtn = document.querySelector('#admin-dashboard-wrapper .dashboard-ver-todos-pedidos');
+
+    // Limpiar estados previos
+    if (ventasTotalesSpan) ventasTotalesSpan.textContent = '...';
+    if (pedidosNuevosSpan) pedidosNuevosSpan.textContent = '...';
+    if (usuariosNuevosSpan) usuariosNuevosSpan.textContent = '...';
+    if (visitasSpan) visitasSpan.textContent = '...';
+    if (tablaPedidos) tablaPedidos.innerHTML = '<tr><td colspan="5" class="text-center">Cargando...</td></tr>';
+    if (graficaVentas && window.dashboardSalesChartInstance) {
+        window.dashboardSalesChartInstance.destroy();
+        window.dashboardSalesChartInstance = null;
+    }
+
+    try {
+        // 1. Métricas principales
+        const [resMetrics, resOrders, resUsers, resVisits] = await Promise.all([
+            fetch(`${API_URL}/api/admin/analytics/sales-overview`, { headers: { 'x-admin-simulated': 'true' } }),
+            fetch(`${API_URL}/api/admin/orders`, { headers: { 'x-admin-simulated': 'true' } }),
+            fetch(`${API_URL}/api/admin/users`, { headers: { 'x-admin-simulated': 'true' } }),
+            fetch(`${API_URL}/api/admin/analytics/product-views`, { headers: { 'x-admin-simulated': 'true' } })
+        ]);
+        const metrics = await resMetrics.json();
+        const orders = await resOrders.json();
+        const users = await resUsers.json();
+        const visitas = await resVisits.json();
+
+        // Ventas totales (últimos 30 días)
+        let totalVentas = 0;
+        if (metrics.dailySales) {
+            totalVentas = metrics.dailySales.reduce((acc, d) => acc + (d.total_ventas || 0), 0);
+        }
+        if (ventasTotalesSpan) ventasTotalesSpan.textContent = formatCOP(totalVentas);
+
+        // Pedidos nuevos (hoy)
+        const hoy = new Date().toISOString().slice(0, 10);
+        const pedidosHoy = Array.isArray(orders) ? orders.filter(o => o.Fecha_Pedido && o.Fecha_Pedido.slice(0, 10) === hoy) : [];
+        if (pedidosNuevosSpan) pedidosNuevosSpan.textContent = pedidosHoy.length;
+
+        // Usuarios nuevos (últimos 30 días)
+        let usuariosNuevos = 0;
+        if (Array.isArray(users)) {
+            const hace30 = new Date();
+            hace30.setDate(hace30.getDate() - 30);
+            usuariosNuevos = users.filter(u => u.created_at && new Date(u.created_at) >= hace30).length;
+        }
+        if (usuariosNuevosSpan) usuariosNuevosSpan.textContent = usuariosNuevos;
+
+        // Visitas (total vistas productos últimos 30 días)
+        let totalVisitas = 0;
+        if (Array.isArray(visitas)) {
+            totalVisitas = visitas.reduce((acc, v) => acc + (v.total_vistas || 0), 0);
+        }
+        if (visitasSpan) visitasSpan.textContent = totalVisitas;
+
+        // 2. Gráfica de ventas diarias
+        if (graficaVentas && metrics.dailySales) {
+            const ctx = graficaVentas.getContext('2d');
+            window.dashboardSalesChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: metrics.dailySales.map(d => d.dia),
+                    datasets: [{
+                        label: 'Ventas',
+                        data: metrics.dailySales.map(d => d.total_ventas),
+                        borderColor: 'var(--color-primary)',
+                        backgroundColor: 'rgba(59,130,246,0.1)',
+                        tension: 0.2
+                    }]
+                },
+                options: { responsive: true, plugins: { legend: { display: false } } }
+            });
+        }
+
+        // 3. Pedidos recientes (últimos 5)
+        if (tablaPedidos) {
+            const ultimos = Array.isArray(orders) ? orders.slice(0, 5) : [];
+            if (ultimos.length === 0) {
+                tablaPedidos.innerHTML = '<tr><td colspan="5" class="text-center">No hay pedidos recientes.</td></tr>';
+            } else {
+                tablaPedidos.innerHTML = ultimos.map(order => `
+                    <tr>
+                        <td>${order.ID_Pedido}</td>
+                        <td>${order.Cliente_Nombre || 'N/A'}</td>
+                        <td>${order.Fecha_Pedido ? new Date(order.Fecha_Pedido).toLocaleDateString() : '-'}</td>
+                        <td>${formatCOP(order.Total_Pedido)}</td>
+                        <td><button class="btn btn-xs btn-primary dashboard-ver-pedido" data-order-id="${order.ID_Pedido}">Ver</button></td>
+                    </tr>
+                `).join('');
+                // Botones ver pedido
+                tablaPedidos.querySelectorAll('.dashboard-ver-pedido').forEach(btn => {
+                    btn.addEventListener('click', e => {
+                        showPageSection('admin-orders');
+                        setTimeout(() => loadAndRenderOrderDetail(btn.dataset.orderId), 300);
+                    });
+                });
+            }
+        }
+        // Botón ver todos
+        if (verTodosBtn) {
+            verTodosBtn.onclick = e => {
+                e.preventDefault();
+                showPageSection('admin-orders');
+            };
+        }
+    } catch (error) {
+        if (ventasTotalesSpan) ventasTotalesSpan.textContent = 'Error';
+        if (pedidosNuevosSpan) pedidosNuevosSpan.textContent = 'Error';
+        if (usuariosNuevosSpan) usuariosNuevosSpan.textContent = 'Error';
+        if (visitasSpan) visitasSpan.textContent = 'Error';
+        if (tablaPedidos) tablaPedidos.innerHTML = '<tr><td colspan="5" class="text-center text-red-600">Error al cargar datos.</td></tr>';
+        if (graficaVentas && window.dashboardSalesChartInstance) {
+            window.dashboardSalesChartInstance.destroy();
+            window.dashboardSalesChartInstance = null;
+        }
+        console.error('Error cargando dashboard admin:', error);
+    }
+}
+
 // --- LÓGICA DE INICIALIZACIÓN DE LA APLICACIÓN ---
 document.addEventListener("DOMContentLoaded", async () => {
     console.log(">>> DOM Cargado. Iniciando App Ferremax...");
@@ -2191,6 +2337,31 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         // FAQ Accordion
         if (faqAccordion) { faqAccordion.addEventListener('click', (e) => { const question = e.target.closest('.faq-question'); if (question) { const item = question.parentElement; item.classList.toggle('active'); } }); }
+
+        // --- ENLACES SIDEBAR ADMIN DASHBOARD ---
+        document.addEventListener('DOMContentLoaded', function() {
+            // Sidebar links dentro del dashboard
+            const adminSidebarLinks = document.querySelectorAll('#admin-dashboard-wrapper aside [data-section]');
+            if (adminSidebarLinks.length) {
+                adminSidebarLinks.forEach(link => {
+                    link.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        const section = link.getAttribute('data-section');
+                        if (section) {
+                            showPageSection(section);
+                        }
+                    });
+                });
+            }
+            // Dashboard principal
+            const dashboardLink = document.getElementById('admin-dashboard-link');
+            if (dashboardLink) {
+                dashboardLink.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    showPageSection('admin-dashboard');
+                });
+            }
+        });
 
         // Initial page display
         console.log(">>> Mostrando Sección Inicial...");
