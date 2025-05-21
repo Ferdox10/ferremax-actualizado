@@ -118,6 +118,18 @@ const modalImage = document.getElementById('modalImage');
 const adminOrdersBadgeDesktop = document.getElementById('admin-orders-badge-desktop');
 const adminOrdersBadgeMobile = document.getElementById('admin-orders-badge-mobile');
 
+// --- DASHBOARD ADMIN ---
+const adminDashboardWrapper = document.getElementById('admin-dashboard-wrapper');
+const adminDashboardLink = document.getElementById('admin-dashboard-link');
+
+// Navegación para el nuevo dashboard
+if (adminDashboardLink) {
+    adminDashboardLink.addEventListener('click', function (e) {
+        e.preventDefault();
+        showPageSection('admin-dashboard');
+    });
+}
+
 // --- HISTORIAL DE COMPRAS ---
 const purchaseHistorySection = document.getElementById('purchase-history-section');
 const purchaseHistoryMessage = document.getElementById('purchase-history-message');
@@ -1340,7 +1352,7 @@ async function showPageSection(sectionId, detailId = null) {
     hideMessages(); // Hide general messages
 
     const publicSections = ['home', 'products', 'contact', 'policies', 'cart', 'faq', 'purchase-history'];
-    const adminSubSections = ['admin-products', 'admin-personalize', 'admin-orders', 'admin-product-stats', 'admin-analytics', 'admin-customers'];
+    const adminSubSections = ['admin-dashboard', 'admin-products', 'admin-personalize', 'admin-orders', 'admin-product-stats', 'admin-analytics', 'admin-customers'];
     
     let needsPublicProducts = ['home', 'products', 'cart'].includes(sectionId) || (sectionId === 'products' && detailId);
 
@@ -1350,6 +1362,7 @@ async function showPageSection(sectionId, detailId = null) {
     
     // Hide all admin sub-sections within the admin container
     if (adminSectionContainer) adminSectionContainer.style.display = "none"; // Hide main admin container
+    if (adminDashboardWrapper) adminDashboardWrapper.style.display = "none";
     if (adminProductsSection) adminProductsSection.style.display = "none";
     if (adminPersonalizeSection) adminPersonalizeSection.style.display = "none";
     if (adminOrdersSection) adminOrdersSection.style.display = "none";
@@ -1379,7 +1392,9 @@ async function showPageSection(sectionId, detailId = null) {
         if (sectionToShow) {
             sectionToShow.style.display = "block";
             // Load data specific to the admin section
-            if (sectionId === 'admin-products') { await loadAdminProducts(); showAdminProductList(); }
+            if (sectionId === 'admin-dashboard' && adminDashboardWrapper) {
+                adminDashboardWrapper.style.display = 'flex';
+            } else if (sectionId === 'admin-products') { await loadAdminProducts(); showAdminProductList(); }
             else if (sectionId === 'admin-personalize') { populatePersonalizeForm(); }
             else if (sectionId === 'admin-orders') { await loadAndRenderAdminOrders(); checkNewOrders(); /* Refresh badge after viewing */ }
             else if (sectionId === 'admin-product-stats') { await loadAndRenderProductViews(); }
