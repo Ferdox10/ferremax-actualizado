@@ -1,10 +1,8 @@
 // server.js - Servidor Backend Unificado para Ferremax con Wompi, Admin CRUD, Personalización y Asistente IA (Gemini)
 // Versión que lee la configuración de la DB desde variables de entorno estándar (.env localmente)
 // Añadido SSL para conexión a TiDB Cloud
-// *** Añadido soporte para 5 imágenes de producto y nuevas funcionalidades de admin ***
-// *** Actualizado para manejar campos de dirección detallados en Pago Contra Entrega ***
-// *** Revisado para asegurar manejo de 'subject' en mensajes de contacto ***
 // *** Integrado Asistente IA con Gemini de Google y logueo detallado para depuración RAG ***
+// *** Mejorado prompt de IA para conciencia de página y conocimiento de políticas ***
 
 // --- DEPENDENCIAS ---
 const express = require('express');
@@ -13,7 +11,7 @@ const mysql = require('mysql2/promise');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 require('dotenv').config();
-const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require("@google/generative-ai"); // Para Gemini
+const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require("@google/generative-ai");
 
 // --- CONFIGURACIÓN GENERAL ---
 const app = express();
@@ -43,7 +41,7 @@ let geminiModel;
 if (process.env.GOOGLE_API_KEY) {
     try {
         genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-        geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" }); // O "gemini-1.5-pro-latest"
+        geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
         console.log("--> SDK de Google AI (Gemini) inicializado correctamente.");
     } catch (e) {
         console.error("!!! Error al inicializar GoogleGenerativeAI. Verifica tu GOOGLE_API_KEY y la configuración del SDK:", e);
@@ -52,7 +50,6 @@ if (process.env.GOOGLE_API_KEY) {
 } else {
     console.warn("!!! GOOGLE_API_KEY no está configurada. El asistente IA con Gemini no funcionará.");
 }
-
 
 // --- CONFIGURACIÓN DEL SITIO DESDE BASE DE DATOS ---
 let siteSettings = {};
@@ -108,14 +105,14 @@ async function loadSiteSettingsFromDB() {
 
 // --- ALMACENAMIENTO TEMPORAL PARA ÓRDENES WOMPI ---
 const wompiTempOrders = {};
-const WOMPI_TEMP_ORDER_TIMEOUT = 1000 * 60 * 30; // 30 minutos
+const WOMPI_TEMP_ORDER_TIMEOUT = 1000 * 60 * 30;
 
 // --- MIDDLEWARE ---
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// --- CONEXIÓN BASE DE DATOS (Con SSL para TiDB Cloud) ---
+// --- CONEXIÓN BASE DE DATOS ---
 let dbPool;
 
 async function initializeApp() {
@@ -137,7 +134,7 @@ async function initializeApp() {
         console.log(`--> Conexión exitosa a la base de datos '${connection.config.database}' en ${connection.config.host}:${connection.config.port}`);
         connection.release();
 
-        await loadSiteSettingsFromDB(); // Cargar settings después de que dbPool esté listo
+        await loadSiteSettingsFromDB();
 
     } catch (error) {
         console.error("!!! Error CRÍTICO al inicializar la aplicación (DB o Settings):", error);
@@ -160,14 +157,14 @@ const checkAdmin = (req, res, next) => {
 const checkUser = async (req, res, next) => {
     const userId = req.headers['x-user-id'];
     if (!userId || isNaN(parseInt(userId))) {
-        console.warn(`\t[User Check] Acceso DENEGADO a ruta de usuario: Falta o es inválido x-user-id.`);
-        return res.status(401).json({ success: false, message: 'Autenticación requerida. Por favor, inicia sesión.' });
+        console.warn(`\t[User Check] Acceso DENEGADO: Falta o es inválido x-user-id.`);
+        return res.status(401).json({ success: false, message: 'Autenticación requerida.' });
     }
     try {
         if (!dbPool) throw new Error("dbPool no inicializado en checkUser");
         const [users] = await dbPool.query('SELECT id FROM usuarios WHERE id = ?', [userId]);
         if (users.length === 0) {
-            console.warn(`\t[User Check] Usuario con ID ${userId} no encontrado en la BD.`);
+            console.warn(`\t[User Check] Usuario con ID ${userId} no encontrado.`);
             return res.status(401).json({ success: false, message: 'Usuario no válido.' });
         }
         req.userId = parseInt(userId);
@@ -187,10 +184,8 @@ async function getOrCreateClienteId({ username, email }) {
     return result.insertId;
 }
 
-// ------------------------------------------------------
 // --- RUTAS ---
-// ------------------------------------------------------
-
+// ... (Rutas de /api/config, auth, productos públicos, categorías, contacto, historial de usuario, wompi, pago contra entrega, y admin se mantienen igual que en la versión anterior) ...
 // --- RUTA PARA CONFIGURACIÓN DEL FRONTEND ---
 app.get('/api/config', (req, res) => {
     console.log("--> GET /api/config");
@@ -505,7 +500,7 @@ app.post('/api/wompi/webhook', async (req, res) => {
                 console.error(`\t\t!!! Rollback (stock fallido): ${failureMessage}`);
             } else {
                 let clienteId = null;
-                const customerEmailForOrder = eventData.customer_email || orderDetails.userEmail; // Priorizar email de Wompi, luego el de la sesión
+                const customerEmailForOrder = eventData.customer_email || orderDetails.userEmail;
                 if(customerEmailForOrder){
                     clienteId = await getOrCreateClienteId({ username: eventData.shipping_address?.full_name || 'Cliente Wompi', email: customerEmailForOrder });
                 }
@@ -515,7 +510,7 @@ app.post('/api/wompi/webhook', async (req, res) => {
                      VALUES (?, ?, 'Pagado', 'Wompi', ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
                     [orderDetails.userId || null, orderDetails.total, transactionReference,
                      eventData.shipping_address?.full_name || customerEmailForOrder || 'Cliente Wompi',
-                     customerEmailForOrder, // Usar el email consolidado
+                     customerEmailForOrder,
                      eventData.shipping_address?.phone_number || 'N/A',
                      `${eventData.shipping_address?.address_line_1 || ''} ${eventData.shipping_address?.address_line_2 || ''}`.trim() || 'N/A',
                      eventData.shipping_address?.region || null,
@@ -576,7 +571,6 @@ app.post('/api/orders/cash-on-delivery', async (req, res) => {
 
         let clienteId = null;
         let userIdToStore = null;
-        // Intentar encontrar usuario por email para asociar ID_Usuario si existe
         const [users] = await dbPool.query('SELECT id FROM usuarios WHERE email = ? LIMIT 1', [customerInfo.email]);
         if (users.length > 0) {
             userIdToStore = users[0].id;
@@ -605,53 +599,52 @@ app.post('/api/orders/cash-on-delivery', async (req, res) => {
 });
 
 // --- RUTAS DE ADMINISTRACIÓN ---
-// (Productos, Usuarios, Settings, Pedidos, Analíticas - Sin cambios significativos)
 app.get('/api/admin/products', checkAdmin, async (req, res) => {
-    try { if (!dbPool) throw new Error("dbP"); const [r] = await dbPool.query('SELECT * FROM producto ORDER BY ID_Producto ASC'); res.status(200).json(r); } 
-    catch (e) { console.error("E GET admin/prod:", e); res.status(500).json({ success: false, message: e.message }); }
+    try { if (!dbPool) throw new Error("dbPool no inicializado en admin/products"); const [r] = await dbPool.query('SELECT * FROM producto ORDER BY ID_Producto ASC'); res.status(200).json(r); } 
+    catch (e) { console.error("Error GET admin/products:", e); res.status(500).json({ success: false, message: e.message }); }
 });
 app.get('/api/admin/products/:id', checkAdmin, async (req, res) => {
-    try { if (!dbPool) throw new Error("dbP"); const { id } = req.params; if (isNaN(id)) return res.status(400).json({ m: 'ID inv.' });
+    try { if (!dbPool) throw new Error("dbPool no inicializado"); const { id } = req.params; if (isNaN(id)) return res.status(400).json({ message: 'ID inválido.' });
         const [r] = await dbPool.query('SELECT * FROM producto WHERE ID_Producto = ?', [id]);
-        if (r.length === 0) return res.status(404).json({ m: 'No enco.' }); res.status(200).json(r[0]);
-    } catch (e) { console.error("E GET admin/prod/id:", e); res.status(500).json({ success: false, message: e.message }); }
+        if (r.length === 0) return res.status(404).json({ message: 'Producto no encontrado.' }); res.status(200).json(r[0]);
+    } catch (e) { console.error("Error GET admin/products/:id:", e); res.status(500).json({ success: false, message: e.message }); }
 });
 app.post('/api/admin/products', checkAdmin, async (req, res) => {
-    try { if (!dbPool) throw new Error("dbP"); const p = req.body; if (!p.Nombre||p.precio_unitario===undefined||p.cantidad===undefined||!p.Marca) return res.status(400).json({m:'Faltan datos.'});
+    try { if (!dbPool) throw new Error("dbPool no inicializado"); const p = req.body; if (!p.Nombre||p.precio_unitario===undefined||p.cantidad===undefined||!p.Marca) return res.status(400).json({message:'Faltan datos.'});
         const pr=parseFloat(p.precio_unitario), cn=parseInt(p.cantidad,10), ci=p.ID_Categoria?parseInt(p.ID_Categoria,10):null;
-        if(isNaN(pr)||pr<0||isNaN(cn)||cn<0||(p.ID_Categoria&&isNaN(ci))) return res.status(400).json({m:'Num inv.'});
+        if(isNaN(pr)||pr<0||isNaN(cn)||cn<0||(p.ID_Categoria&&isNaN(ci))) return res.status(400).json({message:'Datos numéricos inválidos.'});
         const sql = `INSERT INTO producto (Nombre,Descripcion,precio_unitario,Marca,Codigo_Barras,ID_Categoria,cantidad,imagen_url,imagen_url_2,imagen_url_3,imagen_url_4,imagen_url_5) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`;
         const v = [p.Nombre,p.Descripcion||null,pr,p.Marca,p.Codigo_Barras||null,ci,cn,p.imagen_url||null,p.imagen_url_2||null,p.imagen_url_3||null,p.imagen_url_4||null,p.imagen_url_5||null];
-        const [re] = await dbPool.query(sql,v); res.status(201).json({success:true,m:'Prod. añadido.',productId:re.insertId});
-    } catch (e) { console.error("E POST admin/prod:",e); if(e.code==='ER_DUP_ENTRY') return res.status(409).json({m:'Cód. Barras dup.'}); res.status(500).json({success:false,message:e.message});}
+        const [re] = await dbPool.query(sql,v); res.status(201).json({success:true,message:'Producto añadido.', productId:re.insertId});
+    } catch (e) { console.error("Error POST admin/products:",e); if(e.code==='ER_DUP_ENTRY') return res.status(409).json({message:'Cód. Barras duplicado.'}); res.status(500).json({success:false,message:e.message});}
 });
 app.put('/api/admin/products/:id', checkAdmin, async (req, res) => {
-    try { if (!dbPool) throw new Error("dbP"); const {id}=req.params; if(isNaN(id)) return res.status(400).json({m:'ID inv.'});
-        const p=req.body; if(!p.Nombre||p.precio_unitario===undefined||p.cantidad===undefined||!p.Marca) return res.status(400).json({m:'Faltan datos.'});
+    try { if (!dbPool) throw new Error("dbPool no inicializado"); const {id}=req.params; if(isNaN(id)) return res.status(400).json({message:'ID inválido.'});
+        const p=req.body; if(!p.Nombre||p.precio_unitario===undefined||p.cantidad===undefined||!p.Marca) return res.status(400).json({message:'Faltan datos.'});
         const pr=parseFloat(p.precio_unitario), cn=parseInt(p.cantidad,10), ci=p.ID_Categoria?parseInt(p.ID_Categoria,10):null;
-        if(isNaN(pr)||pr<0||isNaN(cn)||cn<0||(p.ID_Categoria&&isNaN(ci))) return res.status(400).json({m:'Num inv.'});
+        if(isNaN(pr)||pr<0||isNaN(cn)||cn<0||(p.ID_Categoria&&isNaN(ci))) return res.status(400).json({message:'Datos numéricos inválidos.'});
         const sql = `UPDATE producto SET Nombre=?,Descripcion=?,precio_unitario=?,Marca=?,Codigo_Barras=?,ID_Categoria=?,cantidad=?,imagen_url=?,imagen_url_2=?,imagen_url_3=?,imagen_url_4=?,imagen_url_5=? WHERE ID_Producto=?`;
         const v = [p.Nombre,p.Descripcion||null,pr,p.Marca,p.Codigo_Barras||null,ci,cn,p.imagen_url||null,p.imagen_url_2||null,p.imagen_url_3||null,p.imagen_url_4||null,p.imagen_url_5||null,id];
-        const [re] = await dbPool.query(sql,v); if(re.affectedRows===0) return res.status(404).json({m:'No enco.'});
-        res.status(200).json({success:true,m:'Prod. act.'});
-    } catch (e) { console.error("E PUT admin/prod/id:",e); if(e.code==='ER_DUP_ENTRY') return res.status(409).json({m:'Cód. Barras dup.'}); res.status(500).json({success:false,message:e.message});}
+        const [re] = await dbPool.query(sql,v); if(re.affectedRows===0) return res.status(404).json({message:'Producto no encontrado.'});
+        res.status(200).json({success:true,message:'Producto actualizado.'});
+    } catch (e) { console.error("Error PUT admin/products/:id:",e); if(e.code==='ER_DUP_ENTRY') return res.status(409).json({message:'Cód. Barras duplicado.'}); res.status(500).json({success:false,message:e.message});}
 });
 app.delete('/api/admin/products/:id', checkAdmin, async (req, res) => {
-    try { if (!dbPool) throw new Error("dbP"); const {id}=req.params; if(isNaN(id)) return res.status(400).json({m:'ID inv.'});
+    try { if (!dbPool) throw new Error("dbPool no inicializado"); const {id}=req.params; if(isNaN(id)) return res.status(400).json({message:'ID inválido.'});
         const [re] = await dbPool.query('DELETE FROM producto WHERE ID_Producto=?',[id]);
-        if(re.affectedRows===0) return res.status(404).json({m:'No enco.'});
-        res.status(200).json({success:true,m:'Prod. elim.'});
-    } catch (e) { console.error("E DELETE admin/prod/id:",e); if(e.code==='ER_ROW_IS_REFERENCED_2') return res.status(409).json({m:'Prod. ref., no elim.'}); res.status(500).json({success:false,message:e.message});}
+        if(re.affectedRows===0) return res.status(404).json({message:'Producto no encontrado.'});
+        res.status(200).json({success:true,message:'Producto eliminado.'});
+    } catch (e) { console.error("Error DELETE admin/products/:id:",e); if(e.code==='ER_ROW_IS_REFERENCED_2') return res.status(409).json({message:'Producto referenciado, no se puede eliminar.'}); res.status(500).json({success:false,message:e.message});}
 });
 app.get('/api/admin/users', checkAdmin, async (req, res) => {
-    try { if (!dbPool) throw new Error("dbP"); const [u] = await dbPool.query('SELECT id,username,email,role FROM usuarios ORDER BY id DESC'); res.status(200).json(u); }
-    catch (e) { console.error("E GET admin/users:",e); res.status(500).json({success:false,message:e.message});}
+    try { if (!dbPool) throw new Error("dbPool no inicializado"); const [u] = await dbPool.query('SELECT id,username,email,role FROM usuarios ORDER BY id DESC'); res.status(200).json(u); }
+    catch (e) { console.error("Error GET admin/users:",e); res.status(500).json({success:false,message:e.message});}
 });
 app.get('/api/admin/settings', checkAdmin, (req, res) => { res.status(200).json({success:true, settings:siteSettings});});
 app.put('/api/admin/settings', checkAdmin, async (req, res) => {
     const newSettings = req.body; const allowed=['colorPrimary','colorSecondary','colorAccent','welcomeTitle','promoBannerTitle','promoBannerText','contactAddress','contactPhone','contactEmail','socialFacebook','socialTwitter','socialInstagram','socialYoutube'];
     let ops=[], changed=false;
-    try { if (!dbPool) throw new Error("dbP");
+    try { if (!dbPool) throw new Error("dbPool no inicializado");
         for(const k in newSettings){
             if(allowed.includes(k) && newSettings[k]!==undefined){
                 if(k.startsWith('color')&&typeof newSettings[k]==='string'&&!/^#[0-9A-Fa-f]{3}([0-9A-Fa-f]{3})?$/.test(newSettings[k])) continue;
@@ -663,54 +656,54 @@ app.put('/api/admin/settings', checkAdmin, async (req, res) => {
         if(ops.length>0){ await Promise.all(ops); res.status(200).json({success:true,message:'Configuración actualizada.',settings:siteSettings});}
         else if(changed){res.status(200).json({success:true,message:'Configuración actualizada (sin cambios BD).',settings:siteSettings});}
         else{res.status(200).json({success:true,message:'No se proporcionaron datos válidos para actualizar.',settings:siteSettings});}
-    } catch (e) { console.error("E PUT admin/settings:",e); res.status(500).json({success:false,message:e.message});}
+    } catch (e) { console.error("Error PUT admin/settings:",e); res.status(500).json({success:false,message:e.message});}
 });
 app.get('/api/admin/orders', checkAdmin, async (req, res) => {
-    try { if (!dbPool) throw new Error("dbP");
+    try { if (!dbPool) throw new Error("dbPool no inicializado");
         const [p] = await dbPool.query(`SELECT ped.ID_Pedido, ped.Fecha_Pedido, ped.Total_Pedido, ped.Estado_Pedido, ped.Metodo_Pago, ped.Referencia_Pago, COALESCE(u.username, ped.Nombre_Cliente_Envio) as Cliente_Nombre, COALESCE(u.email, ped.Email_Cliente_Envio) as Cliente_Email FROM pedidos ped LEFT JOIN usuarios u ON ped.ID_Usuario = u.id ORDER BY ped.Fecha_Pedido DESC`);
         res.status(200).json(p);
-    } catch(e){ console.error("E GET admin/orders:",e); res.status(500).json({success:false,message:e.message});}
+    } catch(e){ console.error("Error GET admin/orders:",e); res.status(500).json({success:false,message:e.message});}
 });
 app.get('/api/admin/orders/:id', checkAdmin, async (req,res)=>{
-    try { if (!dbPool) throw new Error("dbP"); const {id}=req.params; if(isNaN(id))return res.status(400).json({m:'ID inv.'});
+    try { if (!dbPool) throw new Error("dbPool no inicializado"); const {id}=req.params; if(isNaN(id))return res.status(400).json({message:'ID inválido.'});
         const [pi]=await dbPool.query(`SELECT p.*, COALESCE(u.username, p.Nombre_Cliente_Envio) as Cliente_Nombre, COALESCE(u.email, p.Email_Cliente_Envio) as Cliente_Email FROM pedidos p LEFT JOIN usuarios u ON p.ID_Usuario=u.id WHERE p.ID_Pedido=?`,[id]);
-        if(pi.length===0)return res.status(404).json({m:'No enco.'});
+        if(pi.length===0)return res.status(404).json({message:'Pedido no encontrado.'});
         const [d]=await dbPool.query(`SELECT dp.*, pr.Nombre as Nombre_Producto, pr.imagen_url as Imagen_Producto FROM detalles_pedido dp JOIN producto pr ON dp.ID_Producto=pr.ID_Producto WHERE dp.ID_Pedido=?`,[id]);
         res.status(200).json({...pi[0],detalles:d});
-    }catch(e){ console.error("E GET admin/orders/id:",e); res.status(500).json({success:false,message:e.message});}
+    }catch(e){ console.error("Error GET admin/orders/:id:",e); res.status(500).json({success:false,message:e.message});}
 });
 app.put('/api/admin/orders/:id/status', checkAdmin, async (req,res)=>{
-    try { if (!dbPool) throw new Error("dbP"); const {id}=req.params; const {nuevoEstado}=req.body; const valid=['Pendiente de Pago','Pagado','Procesando','Enviado','Entregado','Cancelado','Pendiente de Confirmacion'];
-        if(!valid.includes(nuevoEstado))return res.status(400).json({m:'Estado inv.'});
+    try { if (!dbPool) throw new Error("dbPool no inicializado"); const {id}=req.params; const {nuevoEstado}=req.body; const valid=['Pendiente de Pago','Pagado','Procesando','Enviado','Entregado','Cancelado','Pendiente de Confirmacion'];
+        if(!valid.includes(nuevoEstado))return res.status(400).json({message:'Estado inválido.'});
         const [r]=await dbPool.query('UPDATE pedidos SET Estado_Pedido=? WHERE ID_Pedido=?',[nuevoEstado,id]);
-        if(r.affectedRows===0)return res.status(404).json({m:'No enco.'});
-        res.status(200).json({success:true,m:'Estado act.'});
-    }catch(e){ console.error("E PUT admin/orders/id/status:",e); res.status(500).json({success:false,message:e.message});}
+        if(r.affectedRows===0)return res.status(404).json({message:'Pedido no encontrado.'});
+        res.status(200).json({success:true,message:'Estado actualizado.'});
+    }catch(e){ console.error("Error PUT admin/orders/:id/status:",e); res.status(500).json({success:false,message:e.message});}
 });
 app.get('/api/admin/analytics/sales-overview', checkAdmin, async (req,res)=>{
-    try{ if (!dbPool) throw new Error("dbP");
+    try{ if (!dbPool) throw new Error("dbPool no inicializado");
         const [ds]=await dbPool.query(`SELECT DATE_FORMAT(Fecha_Pedido,'%Y-%m-%d') as dia, SUM(Total_Pedido) as total_ventas FROM pedidos WHERE Estado_Pedido IN ('Pagado','Entregado','Enviado') AND Fecha_Pedido >= CURDATE()-INTERVAL 30 DAY GROUP BY DATE_FORMAT(Fecha_Pedido,'%Y-%m-%d') ORDER BY dia ASC`);
         const [tp]=await dbPool.query(`SELECT p.Nombre, SUM(dp.Cantidad) as total_vendido FROM detalles_pedido dp JOIN producto p ON dp.ID_Producto=p.ID_Producto JOIN pedidos ped ON dp.ID_Pedido=ped.ID_Pedido WHERE ped.Estado_Pedido IN ('Pagado','Entregado','Enviado') GROUP BY dp.ID_Producto,p.Nombre ORDER BY total_vendido DESC LIMIT 10`);
         res.status(200).json({dailySales:ds,topProducts:tp});
-    }catch(e){ console.error("E GET admin/analytics/sales:",e); res.status(500).json({success:false,message:e.message});}
+    }catch(e){ console.error("Error GET admin/analytics/sales:",e); res.status(500).json({success:false,message:e.message});}
 });
 app.get('/api/admin/analytics/product-views', checkAdmin, async (req,res)=>{
-    try{ if (!dbPool) throw new Error("dbP");
+    try{ if (!dbPool) throw new Error("dbPool no inicializado");
         const [pv]=await dbPool.query(`SELECT p.Nombre, COUNT(vp.ID_Vista) as total_vistas FROM vistas_producto vp JOIN producto p ON vp.ID_Producto=p.ID_Producto GROUP BY vp.ID_Producto,p.Nombre ORDER BY total_vistas DESC LIMIT 20`);
         res.status(200).json(pv);
-    }catch(e){ console.error("E GET admin/analytics/views:",e); res.status(500).json({success:false,message:e.message});}
+    }catch(e){ console.error("Error GET admin/analytics/views:",e); res.status(500).json({success:false,message:e.message});}
 });
 app.get('/api/admin/orders/pending-count', checkAdmin, async (req,res)=>{
-    try{ if (!dbPool) throw new Error("dbP");
+    try{ if (!dbPool) throw new Error("dbPool no inicializado");
         const [r]=await dbPool.query("SELECT COUNT(*) as pendingCount FROM pedidos WHERE Estado_Pedido IN ('Pendiente de Confirmacion','Pagado')");
         res.status(200).json({success:true,pendingCount:r[0]?.pendingCount||0});
-    }catch(e){ console.error("E GET admin/orders/pending:",e); res.status(500).json({success:false,message:e.message});}
+    }catch(e){ console.error("Error GET admin/orders/pending:",e); res.status(500).json({success:false,message:e.message});}
 });
 app.get('/api/admin/contact-messages', checkAdmin, async (req, res) => {
-    try { if (!dbPool) throw new Error("dbP");
+    try { if (!dbPool) throw new Error("dbPool no inicializado");
         const [messages] = await dbPool.query('SELECT id, name, email, subject, LEFT(message, 100) as message_preview, created_at FROM contact_messages ORDER BY created_at DESC');
         res.status(200).json(messages);
-    } catch (error) { console.error("E GET admin/contact-messages:",error); res.status(500).json({ success: false, message: error.message }); }
+    } catch (error) { console.error("Error GET admin/contact-messages:",error); res.status(500).json({ success: false, message: error.message }); }
 });
 
 // --- RUTA DEL ASISTENTE IA (GEMINI) ---
@@ -731,11 +724,10 @@ app.post('/api/ai-assistant/chat', async (req, res) => {
         return res.status(500).json({ success: false, message: "Error interno del servidor: Conexión a BD no disponible." });
     }
 
-
     try {
         let productContext = "No se buscaron productos específicos para esta consulta general.";
         const originalKeywords = userMessage.toLowerCase().match(/\b(\w{4,})\b/g) || [];
-        const stopWords = ['hola', 'buenos', 'dias', 'tardes', 'noches', 'quiero', 'saber', 'sobre', 'cuánto', 'cuesta', 'precio', 'dime', 'busco', 'tienes', 'qué', 'como', 'para', 'con', 'por', 'sin', 'desde', 'hacia', 'hasta', 'productos', 'producto', 'cuales', 'condiciones', 'tienen', 'ustedes', 'ferremax', 'favor', 'podrias', 'ayudarme', 'necesito', 'informacion', 'gracias', 'muy', 'muchas'];
+        const stopWords = ['hola', 'buenos', 'dias', 'tardes', 'noches', 'quiero', 'saber', 'sobre', 'cuánto', 'cuesta', 'precio', 'dime', 'busco', 'tienes', 'qué', 'como', 'para', 'con', 'por', 'sin', 'desde', 'hacia', 'hasta', /*'productos', 'producto',*/ 'cuales', /*'condiciones',*/ 'tienen', 'ustedes', 'ferremax', 'favor', 'podrias', 'ayudarme', 'necesito', 'informacion', 'gracias', 'muy', 'muchas', 'disculpa', 'pregunta'];
         const keywords = originalKeywords.filter(word => !stopWords.includes(word));
 
         console.log(`[AI RAG] Original keywords: ${originalKeywords.join(', ')}`);
@@ -750,52 +742,64 @@ app.post('/api/ai-assistant/chat', async (req, res) => {
                 queryParams.push(`%${keyword.toLowerCase()}%`, `%${keyword.toLowerCase()}%`);
             });
             querySql += conditions.join(' OR ');
-            querySql += ' LIMIT 3'; // Limitar a 3 para no saturar el prompt
+            querySql += ' LIMIT 5'; // Aumentado a 5 para más contexto si hay muchos matches
             
             console.log(`[AI RAG] SQL Query: ${querySql}`);
             console.log(`[AI RAG] SQL Params:`, queryParams);
 
-            const [productsDB] = await dbPool.query(querySql, queryParams); // Renombrado para evitar conflicto
+            const [productsDB] = await dbPool.query(querySql, queryParams);
             console.log(`[AI RAG] Productos encontrados en BD (${productsDB.length}):`, JSON.stringify(productsDB, null, 2));
 
             if (productsDB.length > 0) {
-                productContext = "Información de productos relevantes de Ferremax que podrían interesarte (basado en tu consulta):\n";
+                productContext = "Información de productos de Ferremax que podrían ser relevantes para tu consulta (basado en tu búsqueda):\n";
                 productsDB.forEach(p => {
-                    productContext += `- Nombre: ${p.Nombre}, Marca: ${p.Marca}, Precio: ${p.precio_unitario} COP, Stock: ${p.cantidad}. ${p.Descripcion ? 'Descripción breve: ' + p.Descripcion.substring(0, 70) + '...' : ''}\n`;
+                    productContext += `- Nombre: ${p.Nombre}, Marca: ${p.Marca}, Precio: ${p.precio_unitario} COP, Stock: ${p.cantidad}. ${p.Descripcion ? 'Descripción breve: ' + p.Descripcion.substring(0, 80) + '...' : ''}\n`;
                 });
             } else {
-                productContext = "No encontré productos específicos en la base de datos de Ferremax que coincidan con las palabras clave de tu consulta ('" + keywords.join("', '") + "').\n";
+                productContext = "No encontré productos en la base de datos de Ferremax que coincidan directamente con las palabras clave específicas de tu consulta ('" + keywords.join("', '") + "').\n";
             }
         } else {
             productContext = "No se identificaron palabras clave específicas de productos en tu consulta para buscar en la base de datos. Puedo ayudarte con información general o sobre categorías.\n"
         }
 
-        const systemInstruction = `Eres Ferremax IA, un asistente virtual experto y muy amigable de la ferretería Ferremax.
-Tu misión es ayudar a los clientes con sus preguntas sobre productos (nombres, precios, stock, descripciones breves, marcas), disponibilidad y otros temas relacionados con Ferremax.
-Debes basar tus respuestas ESTRICTA Y ÚNICAMENTE en la información de "Contexto recuperado" que te proporciono sobre los productos de Ferremax y la "Información general de la tienda".
-Si la información solicitada no se encuentra en el "Contexto recuperado" ni en la "Información general de la tienda", indica amablemente que no dispones de ese dato específico en este momento, pero que puedes ayudar con otras consultas o invitarlos a ser más específicos.
-NO inventes precios, características, stock o cualquier otro dato que no esté explícitamente en el contexto.
-Si el "Contexto recuperado" indica "No encontré productos específicos...", informa al usuario de esto y sugiérele que revise las categorías o pregunte por un tipo de producto más específico.
-Si el "Contexto recuperado" está vacío o dice "No se buscaron productos...", responde de forma general sobre Ferremax o invita al usuario a preguntar.
+        // Información de políticas directamente en el prompt
+        const ferremaxPolicies = `
+Políticas de Ferremax:
+- Política de Privacidad: Nos tomamos muy en serio la privacidad. Usamos tu información solo para brindarte el mejor servicio y no la compartimos sin tu consentimiento. Cumplimos con las leyes de protección de datos.
+- Política de Devoluciones: Tienes 30 días para devoluciones en productos defectuosos o no satisfactorios. Contáctanos para iniciar el proceso. El producto debe estar en estado original y con embalaje completo.
+- Política de Envío: Hacemos envíos a nivel nacional. Los costos y tiempos varían (generalmente 3-7 días hábiles). Se calculan al comprar. Te informaremos de retrasos.
+- Política de Seguridad: Usamos tecnología de encriptación para proteger tus datos de pago. Implementamos medidas para evitar accesos no autorizados.
+- Política de Atención al Cliente: Nos comprometemos a un excelente servicio. Contáctanos por el formulario o correo; respondemos en 24 horas hábiles.
+- Métodos de Pago: Aceptamos pagos vía Wompi (tarjetas crédito/débito PSE, Nequi, Bancolombia a la mano, efectivo en puntos) y también Pago Contra Entrega.
+`;
+
+
+        const systemInstruction = `Eres Ferremax IA, un asistente virtual experto, amigable y servicial de la ferretería Ferremax. Estás respondiendo a un cliente que YA SE ENCUENTRA NAVEGANDO DENTRO de la página web de Ferremax.
+Tu misión es ayudar a los clientes con sus preguntas sobre productos (nombres, precios, stock, descripciones breves, marcas), disponibilidad, políticas de la tienda, y otros temas relacionados con Ferremax.
+Debes basar tus respuestas ESTRICTA Y ÚNICAMENTE en la información de "Contexto recuperado de productos" y en la "Información general y Políticas de la tienda" que te proporciono.
+NO REDIRIJA AL USUARIO A "LA PÁGINA WEB" O A "VISITAR LA SECCIÓN DE POLÍTICAS", ya que el usuario ya está aquí y tú tienes la información necesaria. Simplemente proporciona la información directamente si la tienes.
+Si la información solicitada no se encuentra en el "Contexto recuperado de productos" ni en la "Información general y Políticas de la tienda", indica amablemente que no dispones de ese dato específico en este momento, pero que puedes ayudar con otras consultas o invítalos a ser más específicos, o a contactar directamente a Ferremax por teléfono o email si la consulta es muy particular.
+No inventes precios, características, stock o cualquier otro dato que no esté explícitamente en el contexto.
+Si el "Contexto recuperado de productos" indica "No encontré productos específicos...", informa al usuario de esto y sugiérele que revise las categorías (mencionándolas) o pregunte por un tipo de producto más específico.
+Si el "Contexto recuperado de productos" está vacío o dice "No se buscaron productos...", responde de forma general sobre Ferremax o invita al usuario a preguntar.
 Al mencionar un producto del contexto, SIEMPRE incluye su nombre, precio y stock si están disponibles.
 Sé conciso, claro y siempre muy amigable.
 Hoy es ${new Date().toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.
 Todos los precios están en pesos colombianos (COP).
 
-Información general de la tienda:
+Información general y Políticas de la tienda:
+${ferremaxPolicies}
 Las principales categorías de productos en Ferremax son: Eléctricas, Manuales, Seguridad, Medición, Tornillería, Jardinería.
 ${siteSettings.promoBannerTitle ? `Promoción actual: "${siteSettings.promoBannerTitle} - ${siteSettings.promoBannerText}"` : ''}
-Información de contacto de Ferremax: Dirección: ${siteSettings.contactAddress || 'No disponible'}, Teléfono: ${siteSettings.contactPhone || 'No disponible'}, Email: ${siteSettings.contactEmail || 'No disponible'}.
-Políticas generales (ej. devoluciones, envíos): Esta información no está disponible directamente para mí, pero el cliente puede consultar la sección de Políticas en la página web.
+Información de contacto de Ferremax (para consultas que no puedas resolver): Dirección: ${siteSettings.contactAddress || 'No disponible'}, Teléfono: ${siteSettings.contactPhone || 'No disponible'}, Email: ${siteSettings.contactEmail || 'No disponible'}.
 ---
-Contexto recuperado:
+Contexto recuperado de productos (si aplica):
 ${productContext}
 ---
 Pregunta del cliente:`;
 
         const fullPrompt = `${systemInstruction}\n${userMessage}`;
         console.log(`\n[AI PROMPT TO GEMINI START]\n${fullPrompt}\n[AI PROMPT TO GEMINI END]\n`);
-
 
         const safetySettings = [
             { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
@@ -805,25 +809,19 @@ Pregunta del cliente:`;
         ];
 
         const generationConfig = {
-            temperature: 0.4, 
-            topK: 30,
-            topP: 0.90,
-            maxOutputTokens: 400, 
+            temperature: 0.3, // Un poco más bajo para ser más factual con las políticas
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 500, // Aumentado un poco por si las políticas son largas
         };
         
-        // Asegúrate de que la firma de generateContent es correcta para tu versión del SDK.
-        // La estructura { contents: [...] } es más robusta para diferentes tipos de modelos y roles.
         const chatSession = geminiModel.startChat({
             generationConfig,
             safetySettings,
-            history: [ // Puedes añadir historial de conversación aquí si lo implementas
-              // { role: "user", parts: [{ text: "Mensaje anterior del usuario" }] },
-              // { role: "model", parts: [{ text: "Respuesta anterior del modelo" }] },
-            ]
+            history: [ /* Aquí podrías agregar el historial de la conversación si lo implementas */ ]
           });
         
-        // const result = await geminiModel.generateContent(fullPrompt, generationConfig, safetySettings); // Esta forma es más simple si tu SDK la soporta bien
-        const result = await chatSession.sendMessage(fullPrompt); // Usando startChat y sendMessage es más estándar
+        const result = await chatSession.sendMessage(fullPrompt);
         
         const response = result.response;
         const aiReply = response.text();
