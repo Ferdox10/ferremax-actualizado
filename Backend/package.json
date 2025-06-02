@@ -18,6 +18,7 @@
   "author": "Fernando Diaz",
   "license": "ISC",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@paypal/checkout-server-sdk": "^1.0.3",
     "bcrypt": "^5.1.1",
     "chart.js": "^4.4.9",

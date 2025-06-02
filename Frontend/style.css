@@ -933,3 +933,49 @@ a.link-primary:hover {
     border: 1px solid #fecaca;
 }
 
+/* AI Assistant Widget Specific Styles */
+#ai-assistant-messages {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-primary) var(--color-light-gray);
+}
+#ai-assistant-messages::-webkit-scrollbar {
+    width: 8px;
+}
+#ai-assistant-messages::-webkit-scrollbar-track {
+    background: var(--color-light-gray);
+    border-radius: 10px;
+}
+#ai-assistant-messages::-webkit-scrollbar-thumb {
+    background-color: var(--color-primary);
+    border-radius: 10px;
+    border: 2px solid var(--color-light-gray);
+}
+.ai-message {
+    max-width: 85%;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.75rem;
+    line-height: 1.4;
+}
+.ai-message-user {
+    background-color: var(--color-primary);
+    color: white;
+    margin-left: auto;
+    border-bottom-right-radius: 0.25rem;
+}
+.ai-message-bot {
+    background-color: #e2e8f0;
+    color: var(--color-dark);
+    margin-right: auto;
+    border-bottom-left-radius: 0.25rem;
+}
+.ai-message-bot.thinking p::after {
+    content: '...';
+    display: inline-block;
+    animation: thinkingDots 1.5s infinite;
+}
+@keyframes thinkingDots {
+    0%, 20% { content: '.'; }
+    40%, 60% { content: '..'; }
+    80%, 100% { content: '...'; }
+}
+
