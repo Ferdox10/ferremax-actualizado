@@ -1674,6 +1674,32 @@ function closeImageModalOnClick(event) {
     }
 }
 
+// --- ANIMACIÓN DE APARICIÓN SECUENCIAL AL SCROLL (REVEAL) ---
+function animateOnScroll() {
+    const revealElements = document.querySelectorAll('.reveal-on-scroll');
+    const windowHeight = window.innerHeight;
+    let delay = 0;
+    revealElements.forEach((el, idx) => {
+        const elementTop = el.getBoundingClientRect().top;
+        if (elementTop < windowHeight - 40) {
+            if (!el.classList.contains('fade-in')) {
+                el.classList.add('animated', 'fade-in');
+                el.style.animationDelay = (delay) + 's';
+                delay += 0.12; // Efecto cascada
+            }
+        }
+    });
+}
+
+window.addEventListener('scroll', animateOnScroll);
+document.addEventListener('DOMContentLoaded', () => {
+    // Aplica la clase reveal-on-scroll a los elementos que quieres animar
+    document.querySelectorAll('.product-card, .faq-item, .category-card, .policy-item').forEach(el => {
+        el.classList.add('reveal-on-scroll');
+    });
+    animateOnScroll(); // Llama al cargar para los que ya están en pantalla
+});
+
 // --- MANEJADORES DE EVENTOS ---
 function handleLogout() {
     localStorage.removeItem("userLoggedIn");
@@ -1802,7 +1828,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                     showMessage(contactMessageResponseDiv, "Por favor, completa todos los campos.", true); contactSubmitButton.disabled = false; contactSubmitButton.textContent = "Enviar Mensaje"; return;
                 }
                 try {
-                    const response = await fetch(`${API_URL}/api/contact`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(contactData) });
+                    const response = await fetch(`${API_URL}/api/contact`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(contactData) });
                     const result = await response.json();
                     if (response.ok && result.success) { showMessage(contactMessageResponseDiv, "¡Mensaje recibido! Gracias por contactarnos.", false); contactForm.reset();
                     } else { showMessage(contactMessageResponseDiv, result.message || "Error al enviar el mensaje.", true); }
@@ -2174,3 +2200,33 @@ document.addEventListener('DOMContentLoaded', () => {
             if(newIndicatorsContainer) newIndicatorsContainer.style.display = 'none';
         });
 });
+
+// Ejemplo de animación global: aplicar fade-in a secciones principales al mostrarlas
+const allSections = document.querySelectorAll('#page-content > div[id$="-section"], #page-content > section[id$="-section"]');
+allSections.forEach(sec => {
+    sec.classList.add('animated');
+    sec.classList.add('fade-in');
+    // Elimina la animación para que se pueda volver a aplicar si se oculta/muestra
+    sec.addEventListener('animationend', () => {
+        sec.classList.remove('fade-in');
+    });
+});
+
+// Si tienes modales, chatbox, banners, etc., puedes aplicar slide-up o fade-in así:
+const aiAssistantChatbox = document.getElementById('ai-assistant-chatbox');
+if (aiAssistantChatbox) {
+    aiAssistantChatbox.classList.add('animated');
+    // Cuando se muestre, aplica la animación
+    aiAssistantChatbox.addEventListener('transitionend', () => {
+        aiAssistantChatbox.classList.remove('slide-up');
+    });
+    // Ejemplo: cuando se abre el chat
+    const aiAssistantToggle = document.getElementById('ai-assistant-toggle');
+    if (aiAssistantToggle) {
+        aiAssistantToggle.addEventListener('click', () => {
+            if (!aiAssistantChatbox.classList.contains('hidden')) {
+                aiAssistantChatbox.classList.add('slide-up');
+            }
+        });
+    }
+}
