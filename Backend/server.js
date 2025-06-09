@@ -596,7 +596,7 @@ app.post('/api/orders/cash-on-delivery', async (req, res) => {
             `INSERT INTO pedidos (ID_Usuario, Total_Pedido, Estado_Pedido, Metodo_Pago, Nombre_Cliente_Envio, Direccion_Envio, Departamento_Envio, Ciudad_Envio, Punto_Referencia_Envio, Telefono_Cliente_Envio, Email_Cliente_Envio, Fecha_Pedido, ID_Cliente)
              VALUES (?, ?, 'Pendiente de Confirmacion', 'ContraEntrega', ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
             [
-                userIdToStore,
+                customerInfo.userId || null, // CORRECCIÓN AQUÍ
                 totalPedido,
                 customerInfo.name,
                 customerInfo.address,
