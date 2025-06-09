@@ -175,12 +175,25 @@ const checkUser = async (req, res, next) => {
     }
 };
 
-// --- HELPER PARA CLIENTE ---
-async function getOrCreateClienteId({ username, email }) {
-    if (!dbPool) throw new Error("dbPool no inicializado en getOrCreateClienteId");
-    const [clientes] = await dbPool.query('SELECT ID_Cliente FROM cliente WHERE Email = ? LIMIT 1', [email]);
-    if (clientes.length > 0) return clientes[0].ID_Cliente;
-    const [result] = await dbPool.query('INSERT INTO cliente (Nombre, Apellido, Email) VALUES (?, ?, ?)', [username || 'Cliente', '', email]);
+// --- FUNCIÓN HELPER MEJORADA ---
+async function getOrCreateClienteId(connection, { username, email }) {
+    if (!email) {
+        throw new Error("El email es requerido para crear o encontrar un cliente.");
+    }
+    // Usar la conexión de la transacción para todas las consultas
+    const [clientes] = await connection.query('SELECT ID_Cliente FROM cliente WHERE Email = ? LIMIT 1', [email]);
+    if (clientes.length > 0) {
+        console.log(`\t\tCliente encontrado con email ${email}, ID: ${clientes[0].ID_Cliente}`);
+        return clientes[0].ID_Cliente;
+    }
+    // Si no existe, crear uno nuevo
+    console.log(`\t\tCliente no encontrado, creando nuevo cliente para email ${email}...`);
+    const [result] = await connection.query(
+        'INSERT INTO cliente (Nombre, Apellido, Email) VALUES (?, ?, ?)',
+
+        [username || email.split('@')[0], '', email]
+    );
+    console.log(`\t\tNuevo cliente creado con ID: ${result.insertId}`);
     return result.insertId;
 }
 
@@ -473,12 +486,8 @@ app.post('/api/wompi/webhook', async (req, res) => {
     }
 
     if (transactionStatus === 'APPROVED') {
-        console.log(`\t[Webhook Wompi] Transacción APROBADA para Ref: ${transactionReference}.`);
         let connection;
-        let updateFailed = false;
-        let failureMessage = '';
         try {
-            if (!dbPool) throw new Error("dbPool no inicializado en webhook Wompi");
             connection = await dbPool.getConnection();
             await connection.beginTransaction();
             console.log("\t\tIniciando transacción DB...");
@@ -499,24 +508,31 @@ app.post('/api/wompi/webhook', async (req, res) => {
                 await connection.rollback();
                 console.error(`\t\t!!! Rollback (stock fallido): ${failureMessage}`);
             } else {
+                // Lógica para obtener ID_Cliente unificada y robusta
                 let clienteId = null;
-                const customerEmailForOrder = eventData.customer_email || orderDetails.userEmail;
-                if(customerEmailForOrder){
-                    clienteId = await getOrCreateClienteId({ username: eventData.shipping_address?.full_name || 'Cliente Wompi', email: customerEmailForOrder });
+                const customerEmail = eventData.customer_email;
+                if (!customerEmail) throw new Error("Wompi no proporcionó un email de cliente.");
+                const customerName = orderDetails.customerData?.fullName || eventData.customer_data?.full_name || 'Cliente Wompi';
+                clienteId = await getOrCreateClienteId(connection, { username: customerName, email: customerEmail });
+                if (!clienteId) {
+                    throw new Error(`No se pudo crear o encontrar un ID de cliente para el email ${customerEmail}`);
                 }
-
                 const [pedidoResult] = await connection.query(
                     `INSERT INTO pedidos (ID_Usuario, Total_Pedido, Estado_Pedido, Metodo_Pago, Referencia_Pago, Nombre_Cliente_Envio, Email_Cliente_Envio, Telefono_Cliente_Envio, Direccion_Envio, Departamento_Envio, Ciudad_Envio, Punto_Referencia_Envio, Fecha_Pedido, ID_Cliente)
                      VALUES (?, ?, 'Pagado', 'Wompi', ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
-                    [orderDetails.userId || null, orderDetails.total, transactionReference,
-                     eventData.shipping_address?.full_name || customerEmailForOrder || 'Cliente Wompi',
-                     customerEmailForOrder,
-                     eventData.shipping_address?.phone_number || 'N/A',
-                     `${eventData.shipping_address?.address_line_1 || ''} ${eventData.shipping_address?.address_line_2 || ''}`.trim() || 'N/A',
-                     eventData.shipping_address?.region || null,
-                     eventData.shipping_address?.city || null,
-                     null, 
-                     clienteId]
+                    [
+                        orderDetails.userId || null,
+                        orderDetails.total,
+                        transactionReference,
+                        eventData.shipping_address?.full_name || customerEmail || 'Cliente Wompi',
+                        customerEmail,
+                        eventData.shipping_address?.phone_number || 'N/A',
+                        `${eventData.shipping_address?.address_line_1 || ''} ${eventData.shipping_address?.address_line_2 || ''}`.trim() || 'N/A',
+                        eventData.shipping_address?.region || null,
+                        eventData.shipping_address?.city || null,
+                        null,
+                        clienteId
+                    ]
                 );
                 const pedidoId = pedidoResult.insertId;
                 const detallePromises = orderDetails.items.map(item =>
@@ -555,7 +571,6 @@ app.post('/api/orders/cash-on-delivery', async (req, res) => {
     }
     let connection;
     try {
-        if (!dbPool) throw new Error("dbPool no inicializado en /api/orders/cash-on-delivery");
         connection = await dbPool.getConnection();
         await connection.beginTransaction();
         let totalPedido = 0;
@@ -569,18 +584,29 @@ app.post('/api/orders/cash-on-delivery', async (req, res) => {
             totalPedido += item.price * item.quantity;
         }
 
+        // Lógica para obtener ID_Cliente unificada y robusta
         let clienteId = null;
-        let userIdToStore = null;
-        const [users] = await dbPool.query('SELECT id FROM usuarios WHERE email = ? LIMIT 1', [customerInfo.email]);
-        if (users.length > 0) {
-            userIdToStore = users[0].id;
+        const customerEmail = customerInfo.email;
+        const customerName = customerInfo.name;
+        clienteId = await getOrCreateClienteId(connection, { username: customerName, email: customerEmail });
+        if (!clienteId) {
+            throw new Error(`No se pudo crear o encontrar un ID de cliente para el email ${customerEmail}`);
         }
-        clienteId = await getOrCreateClienteId({ username: customerInfo.name, email: customerInfo.email });
-
         const [pedidoResult] = await connection.query(
             `INSERT INTO pedidos (ID_Usuario, Total_Pedido, Estado_Pedido, Metodo_Pago, Nombre_Cliente_Envio, Direccion_Envio, Departamento_Envio, Ciudad_Envio, Punto_Referencia_Envio, Telefono_Cliente_Envio, Email_Cliente_Envio, Fecha_Pedido, ID_Cliente)
              VALUES (?, ?, 'Pendiente de Confirmacion', 'ContraEntrega', ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
-            [userIdToStore, totalPedido, customerInfo.name, customerInfo.address, customerInfo.department, customerInfo.city, customerInfo.referencePoint || null, customerInfo.phone, customerInfo.email, clienteId]
+            [
+                userIdToStore,
+                totalPedido,
+                customerInfo.name,
+                customerInfo.address,
+                customerInfo.department,
+                customerInfo.city,
+                customerInfo.referencePoint || null,
+                customerInfo.phone,
+                customerInfo.email,
+                clienteId
+            ]
         );
         const pedidoId = pedidoResult.insertId;
         for (const item of cart) {
