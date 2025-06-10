@@ -839,6 +839,47 @@ app.post('/api/admin/reply-message', checkAdmin, async (req, res) => {
     }
 });
 
+// --- RUTA PARA ACTUALIZAR EL ESTADO DE UN MENSAJE (LEÍDO, ARCHIVADO) ---
+app.patch('/api/admin/messages/:id/status', checkAdmin, async (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body; // 'read', 'unread', 'archived'
+
+    if (!['read', 'unread', 'archived'].includes(status)) {
+        return res.status(400).json({ success: false, message: 'Estado no válido.' });
+    }
+
+    try {
+        await dbPool.query('UPDATE contact_messages SET status = ? WHERE id = ?', [status, id]);
+        res.status(200).json({ success: true, message: `Mensaje actualizado a ${status}.` });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error al actualizar el estado del mensaje.' });
+    }
+});
+
+// --- RUTA PARA DESTACAR/DES-DESTACAR UN MENSAJE ---
+app.patch('/api/admin/messages/:id/star', checkAdmin, async (req, res) => {
+    const { id } = req.params;
+    const { is_starred } = req.body; // true o false
+
+    try {
+        await dbPool.query('UPDATE contact_messages SET is_starred = ? WHERE id = ?', [is_starred, id]);
+        res.status(200).json({ success: true, message: `Mensaje ${is_starred ? 'destacado' : 'des-destacado'}.` });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error al destacar el mensaje.' });
+    }
+});
+
+// --- RUTA PARA ELIMINAR UN MENSAJE ---
+app.delete('/api/admin/messages/:id', checkAdmin, async (req, res) => {
+    const { id } = req.params;
+    try {
+        await dbPool.query('DELETE FROM contact_messages WHERE id = ?', [id]);
+        res.status(200).json({ success: true, message: 'Mensaje eliminado permanentemente.' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error al eliminar el mensaje.' });
+    }
+});
+
 // --- RUTA DEL ASISTENTE IA (GEMINI) ---
 app.post('/api/ai-assistant/chat', async (req, res) => {
     const userMessage = req.body.message;
