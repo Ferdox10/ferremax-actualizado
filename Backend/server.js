@@ -12,6 +12,7 @@ const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 require('dotenv').config();
 const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require("@google/generative-ai");
+const nodemailer = require('nodemailer');
 
 // --- CONFIGURACIÓN GENERAL ---
 const app = express();
@@ -771,6 +772,71 @@ app.get('/api/admin/contact-messages', checkAdmin, async (req, res) => {
         const [messages] = await dbPool.query('SELECT id, name, email, subject, LEFT(message, 100) as message_preview, created_at FROM contact_messages ORDER BY created_at DESC');
         res.status(200).json(messages);
     } catch (error) { console.error("Error GET admin/contact-messages:",error); res.status(500).json({ success: false, message: error.message }); }
+});
+
+// --- CONFIGURACIÓN DE NODEMAILER (después de las configs de wompi, gemini, etc.) ---
+let transporter;
+if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASS) {
+    transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            user: process.env.GMAIL_USER,
+            pass: process.env.GMAIL_APP_PASS,
+        },
+    });
+    console.log("--> Transportador de Nodemailer (Gmail) configurado correctamente.");
+} else {
+    console.warn("!!! Faltan credenciales GMAIL_USER o GMAIL_APP_PASS. La función de responder mensajes no funcionará.");
+}
+
+// --- NUEVA RUTA PARA OBTENER MENSAJES DE CONTACTO ---
+app.get('/api/admin/messages', checkAdmin, async (req, res) => {
+    console.log("--> GET /api/admin/messages (Admin)");
+    try {
+        const [messages] = await dbPool.query('SELECT * FROM contact_messages ORDER BY created_at DESC');
+        // --- LOG DE DEPURACIÓN CRUCIAL ---
+        console.log(`\t<-- Consulta a DB devolvió ${messages.length} mensajes.`);
+        res.status(200).json({ success: true, messages: messages });
+    } catch (error) {
+        console.error("!!! Error en /api/admin/messages:", error);
+        res.status(500).json({ success: false, message: 'Error al cargar los mensajes desde el servidor.' });
+    }
+});
+
+// --- NUEVA RUTA PARA ENVIAR RESPUESTA POR CORREO ---
+app.post('/api/admin/reply-message', checkAdmin, async (req, res) => {
+    const { recipientEmail, subject, body } = req.body;
+    console.log(`--> POST /api/admin/reply-message a: ${recipientEmail}`);
+
+    if (!transporter) {
+        return res.status(503).json({ success: false, message: 'El servicio de correo no está configurado en el servidor.' });
+    }
+    if (!recipientEmail || !subject || !body) {
+        return res.status(400).json({ success: false, message: 'Faltan datos para enviar la respuesta.' });
+    }
+
+    const mailOptions = {
+        from: `"Ferremax" <${process.env.GMAIL_USER}>`,
+        to: recipientEmail,
+        subject: `Re: ${subject}`,
+        html: `
+            <p>Hola,</p>
+            <p>Gracias por contactar a Ferremax. Aquí tienes la respuesta a tu consulta:</p>
+            <blockquote style="border-left: 2px solid #ccc; padding-left: 1em; margin-left: 1em; color: #555;">
+                ${body}
+            </blockquote>
+            <p>Saludos,<br>El equipo de Ferremax</p>
+        `,
+    };
+
+    try {
+        await transporter.sendMail(mailOptions);
+        console.log(`\t<-- Respuesta enviada exitosamente a ${recipientEmail}`);
+        res.status(200).json({ success: true, message: 'Respuesta enviada con éxito.' });
+    } catch (error) {
+        console.error("!!! Error al enviar correo con Nodemailer:", error);
+        res.status(500).json({ success: false, message: 'Error al enviar el correo.' });
+    }
 });
 
 // --- RUTA DEL ASISTENTE IA (GEMINI) ---
