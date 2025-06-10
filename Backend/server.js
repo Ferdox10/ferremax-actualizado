@@ -331,6 +331,47 @@ app.get('/api/productos/:id', async (req, res) => {
     }
 });
 
+// --- RUTA PARA OBTENER RESEÑAS DE UN PRODUCTO ---
+app.get('/api/products/:id/reviews', async (req, res) => {
+    const { id: productId } = req.params;
+    console.log(`--> GET /api/products/${productId}/reviews`);
+    try {
+        const [reviews] = await dbPool.query(
+            'SELECT * FROM reseñas WHERE ID_Producto = ? ORDER BY Fecha_Reseña DESC',
+            [productId]
+        );
+        res.status(200).json({ success: true, reviews });
+    } catch (error) {
+        console.error(`!!! Error al obtener reseñas para el producto ${productId}:`, error);
+        res.status(500).json({ success: false, message: 'Error al cargar las reseñas.' });
+    }
+});
+
+// --- RUTA PARA ENVIAR UNA NUEVA RESEÑA ---
+app.post('/api/products/:id/reviews', async (req, res) => {
+    const { id: productId } = req.params;
+    const { userId, name, rating, comment } = req.body;
+    console.log(`--> POST /api/products/${productId}/reviews`);
+
+    if (!name || !rating || !comment) {
+        return res.status(400).json({ success: false, message: 'Nombre, calificación y comentario son requeridos.' });
+    }
+    if (rating < 1 || rating > 5) {
+        return res.status(400).json({ success: false, message: 'La calificación debe ser entre 1 y 5.' });
+    }
+
+    try {
+        await dbPool.query(
+            'INSERT INTO reseñas (ID_Producto, ID_Usuario, Nombre_Usuario, Calificacion, Comentario, Fecha_Reseña) VALUES (?, ?, ?, ?, ?, NOW())',
+            [productId, userId || null, name, rating, comment]
+        );
+        res.status(201).json({ success: true, message: '¡Gracias por tu reseña!' });
+    } catch (error) {
+        console.error(`!!! Error al guardar la reseña para el producto ${productId}:`, error);
+        res.status(500).json({ success: false, message: 'No se pudo guardar tu reseña en este momento.' });
+    }
+});
+
 app.get('/api/categories', async (req, res) => {
     console.log("--> GET /api/categories");
     try {
