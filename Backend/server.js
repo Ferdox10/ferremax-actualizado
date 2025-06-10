@@ -917,6 +917,27 @@ app.put('/api/admin/content/policies', checkAdmin, async (req, res) => {
     }
 });
 
+app.put('/api/admin/content/faq', checkAdmin, async (req, res) => {
+    const { faqs } = req.body;
+    if (!Array.isArray(faqs)) return res.status(400).json({ success: false, message: 'Formato inválido.' });
+    
+    let connection;
+    try {
+        connection = await dbPool.getConnection();
+        await connection.beginTransaction();
+        for (const faq of faqs) {
+            await connection.query('UPDATE preguntas_frecuentes SET pregunta = ?, respuesta = ? WHERE id = ?', [faq.pregunta, faq.respuesta, faq.id]);
+        }
+        await connection.commit();
+        res.status(200).json({ success: true, message: 'Preguntas Frecuentes actualizadas.' });
+    } catch (error) {
+        if (connection) await connection.rollback();
+        res.status(500).json({ success: false, message: 'Error al actualizar las preguntas.' });
+    } finally {
+        if (connection) connection.release();
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`Servidor corriendo en http://localhost:${PORT}`);
     initializeApp();
