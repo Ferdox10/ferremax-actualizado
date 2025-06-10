@@ -205,10 +205,10 @@ app.get('/api/config', (req, res) => {
     try {
         res.status(200).json({
             success: true,
-            wompiPublicKey: WOMPI_PUBLIC_KEY,
-            frontendBaseUrl: FRONTEND_URL
+            wompiPublicKey: process.env.WOMPI_PUBLIC_KEY,
+            webhookUrl: `${process.env.BACKEND_URL}/api/wompi/webhook` // <<< AÑADIDO >>>
         });
-        console.log("\t<-- Enviando configuración pública al frontend.");
+        console.log("\t<-- Enviando configuración pública (Wompi Key y Webhook URL) al frontend.");
     } catch (error) {
         console.error("!!! Error en /api/config:", error);
         res.status(500).json({ success: false, message: 'Error al obtener la configuración.' });
@@ -753,14 +753,11 @@ app.post('/api/ai-assistant/chat', async (req, res) => {
     try {
         let productContext = "No se buscaron productos específicos para esta consulta general.";
         const originalKeywords = userMessage.toLowerCase().match(/\b(\w{4,})\b/g) || [];
-        const stopWords = ['hola', 'buenos', 'dias', 'tardes', 'noches', 'quiero', 'saber', 'sobre', 'cuánto', 'cuesta', 'precio', 'dime', 'busco', 'tienes', 'qué', 'como', 'para', 'con', 'por', 'sin', 'desde', 'hacia', 'hasta', /*'productos', 'producto',*/ 'cuales', /*'condiciones',*/ 'tienen', 'ustedes', 'ferremax', 'favor', 'podrias', 'ayudarme', 'necesito', 'informacion', 'gracias', 'muy', 'muchas', 'disculpa', 'pregunta'];
+        const stopWords = ['hola', 'buenos', 'dias', 'tardes', 'noches', 'quiero', 'saber', 'sobre', 'cuánto', 'cuesta', 'precio', 'dime', 'busco', 'tienes', 'qué', 'como', 'para', 'con', 'por', 'sin', 'desde', 'hacia', 'hasta', 'cuales', 'tienen', 'ustedes', 'ferremax', 'favor', 'podrias', 'ayudarme', 'necesito', 'informacion', 'gracias', 'muy', 'muchas', 'disculpa', 'pregunta'];
         const keywords = originalKeywords.filter(word => !stopWords.includes(word));
 
-        console.log(`[AI RAG] Original keywords: ${originalKeywords.join(', ')}`);
-        console.log(`[AI RAG] Filtered keywords for DB search: "${keywords.join(', ')}"`);
-
         if (keywords.length > 0) {
-            let querySql = 'SELECT Nombre, Descripcion, precio_unitario, cantidad, Marca FROM producto WHERE ';
+            let querySql = 'SELECT ID_Producto, Nombre, Descripcion, precio_unitario, cantidad, Marca FROM producto WHERE ';
             const conditions = [];
             const queryParams = [];
             keywords.forEach(keyword => {
@@ -768,18 +765,14 @@ app.post('/api/ai-assistant/chat', async (req, res) => {
                 queryParams.push(`%${keyword.toLowerCase()}%`, `%${keyword.toLowerCase()}%`);
             });
             querySql += conditions.join(' OR ');
-            querySql += ' LIMIT 5'; // Aumentado a 5 para más contexto si hay muchos matches
-            
-            console.log(`[AI RAG] SQL Query: ${querySql}`);
-            console.log(`[AI RAG] SQL Params:`, queryParams);
+            querySql += ' LIMIT 5';
 
             const [productsDB] = await dbPool.query(querySql, queryParams);
-            console.log(`[AI RAG] Productos encontrados en BD (${productsDB.length}):`, JSON.stringify(productsDB, null, 2));
-
             if (productsDB.length > 0) {
-                productContext = "Información de productos de Ferremax que podrían ser relevantes para tu consulta (basado en tu búsqueda):\n";
+                productContext = "Información de productos de Ferremax que podrían ser relevantes:\n";
                 productsDB.forEach(p => {
-                    productContext += `- Nombre: ${p.Nombre}, Marca: ${p.Marca}, Precio: ${p.precio_unitario} COP, Stock: ${p.cantidad}. ${p.Descripcion ? 'Descripción breve: ' + p.Descripcion.substring(0, 80) + '...' : ''}\n`;
+                    // <<< AÑADIR EL ID_Producto AL CONTEXTO >>>
+                    productContext += `- ID: ${p.ID_Producto}, Nombre: ${p.Nombre}, Marca: ${p.Marca}, Precio: ${p.precio_unitario} COP, Stock: ${p.cantidad}. ${p.Descripcion ? 'Descripción breve: ' + p.Descripcion.substring(0, 80) + '...' : ''}\n`;
                 });
             } else {
                 productContext = "No encontré productos en la base de datos de Ferremax que coincidan directamente con las palabras clave específicas de tu consulta ('" + keywords.join("', '") + "').\n";
@@ -800,27 +793,23 @@ Políticas de Ferremax:
 `;
 
 
-        const systemInstruction = `Eres Ferremax IA, un asistente virtual experto, amigable y servicial de la ferretería Ferremax. Estás respondiendo a un cliente que YA SE ENCUENTRA NAVEGANDO DENTRO de la página web de Ferremax.
-Tu misión es ayudar a los clientes con sus preguntas sobre productos (nombres, precios, stock, descripciones breves, marcas), disponibilidad, políticas de la tienda, y otros temas relacionados con Ferremax.
-Debes basar tus respuestas ESTRICTA Y ÚNICAMENTE en la información de "Contexto recuperado de productos" y en la "Información general y Políticas de la tienda" que te proporciono.
-NO REDIRIJA AL USUARIO A "LA PÁGINA WEB" O A "VISITAR LA SECCIÓN DE POLÍTICAS", ya que el usuario ya está aquí y tú tienes la información necesaria. Simplemente proporciona la información directamente si la tienes.
-Si la información solicitada no se encuentra en el "Contexto recuperado de productos" ni en la "Información general y Políticas de la tienda", indica amablemente que no dispones de ese dato específico en este momento, pero que puedes ayudar con otras consultas o invítalos a ser más específicos, o a contactar directamente a Ferremax por teléfono o email si la consulta es muy particular.
-No inventes precios, características, stock o cualquier otro dato que no esté explícitamente en el contexto.
-Si el "Contexto recuperado de productos" indica "No encontré productos específicos...", informa al usuario de esto y sugiérele que revise las categorías (mencionándolas) o pregunte por un tipo de producto más específico.
-Si el "Contexto recuperado de productos" está vacío o dice "No se buscaron productos...", responde de forma general sobre Ferremax o invita al usuario a preguntar.
-Al mencionar un producto del contexto, SIEMPRE incluye su nombre, precio y stock si están disponibles.
-Sé conciso, claro y siempre muy amigable.
-Hoy es ${new Date().toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}.
-Todos los precios están en pesos colombianos (COP).
+        // --- INSTRUCCIÓN DE SISTEMA MEJORADA ---
+        const systemInstruction = `Eres Ferremax IA, un asistente virtual experto y amigable de la ferretería Ferremax. Tu misión es ayudar a los clientes con sus preguntas sobre productos y políticas.
 
-Información general y Políticas de la tienda:
-${ferremaxPolicies}
-Las principales categorías de productos en Ferremax son: Eléctricas, Manuales, Seguridad, Medición, Tornillería, Jardinería.
-${siteSettings.promoBannerTitle ? `Promoción actual: "${siteSettings.promoBannerTitle} - ${siteSettings.promoBannerText}"` : ''}
-Información de contacto de Ferremax (para consultas que no puedas resolver): Dirección: ${siteSettings.contactAddress || 'No disponible'}, Teléfono: ${siteSettings.contactPhone || 'No disponible'}, Email: ${siteSettings.contactEmail || 'No disponible'}.
+Reglas de respuesta:
+1.  Basa tus respuestas ESTRICTA Y ÚNICAMENTE en la información de "Contexto de Productos" y "Políticas de la Tienda" que te proporciono.
+2.  **¡IMPORTANTE! Si mencionas un producto específico del contexto, DEBES formatearlo como un enlace Markdown usando su ID. La sintaxis es: [Nombre del Producto](/products/ID_DEL_PRODUCTO). Ejemplo: "Claro, tenemos el [Rotomartillo MaxForce 800W](/products/15) en stock."**
+3.  Al mencionar un producto, SIEMPRE incluye su nombre, precio y stock si están disponibles.
+4.  NO REDIRIJA AL USUARIO a "la página web" o a "visitar una sección", ya que el usuario ya está aquí y tú tienes la información. Proporciona la respuesta directamente.
+5.  Si no encuentras un producto específico, informa al usuario amablemente y sugiérele que revise las categorías o sea más específico. No inventes productos ni IDs.
+6.  Sé conciso, claro y siempre muy amigable.
+
 ---
-Contexto recuperado de productos (si aplica):
-${productContext}
+Políticas de la Tienda:
+${ferremaxPolicies}
+---
+Contexto de Productos (ID, Nombre, Precio, Stock, Descripción):
+${productContext} 
 ---
 Pregunta del cliente:`;
 
