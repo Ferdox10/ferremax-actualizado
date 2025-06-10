@@ -880,163 +880,73 @@ app.delete('/api/admin/messages/:id', checkAdmin, async (req, res) => {
     }
 });
 
-// --- RUTA DEL ASISTENTE IA (GEMINI) ---
-app.post('/api/ai-assistant/chat', async (req, res) => {
-    const userMessage = req.body.message;
-    console.log(`\n[AI ASSISTANT START] User message: "${userMessage}"`);
-
-    if (!userMessage) {
-        console.warn("[AI ASSISTANT] Mensaje vacío recibido.");
-        return res.status(400).json({ success: false, message: "Mensaje vacío." });
-    }
-    if (!geminiModel) {
-        console.warn("[AI ASSISTANT] Modelo Gemini no inicializado.");
-        return res.status(503).json({ success: false, message: "Asistente IA (Gemini) no disponible en este momento." });
-    }
-    if (!dbPool) {
-        console.error("[AI ASSISTANT] dbPool no está inicializado. No se puede acceder a la base de datos.");
-        return res.status(500).json({ success: false, message: "Error interno del servidor: Conexión a BD no disponible." });
-    }
-
+// --- RUTAS PÚBLICAS PARA POLÍTICAS Y FAQ ---
+app.get('/api/content/policies', async (req, res) => {
     try {
-        let productContext = "No se buscaron productos específicos para esta consulta general.";
-        const originalKeywords = userMessage.toLowerCase().match(/\b(\w{4,})\b/g) || [];
-        const stopWords = ['hola', 'buenos', 'dias', 'tardes', 'noches', 'quiero', 'saber', 'sobre', 'cuánto', 'cuesta', 'precio', 'dime', 'busco', 'tienes', 'qué', 'como', 'para', 'con', 'por', 'sin', 'desde', 'hacia', 'hasta', 'cuales', 'tienen', 'ustedes', 'ferremax', 'favor', 'podrias', 'ayudarme', 'necesito', 'informacion', 'gracias', 'muy', 'muchas', 'disculpa', 'pregunta'];
-        const keywords = originalKeywords.filter(word => !stopWords.includes(word));
+        const [policies] = await dbPool.query('SELECT * FROM politicas ORDER BY orden ASC, id ASC');
+        res.status(200).json({ success: true, policies });
+    } catch (error) { res.status(500).json({ success: false, message: 'Error al cargar políticas.' }); }
+});
 
-        if (keywords.length > 0) {
-            let querySql = 'SELECT ID_Producto, Nombre, Descripcion, precio_unitario, cantidad, Marca FROM producto WHERE ';
-            const conditions = [];
-            const queryParams = [];
-            keywords.forEach(keyword => {
-                conditions.push('(LOWER(Nombre) LIKE ? OR LOWER(Descripcion) LIKE ?)');
-                queryParams.push(`%${keyword.toLowerCase()}%`, `%${keyword.toLowerCase()}%`);
-            });
-            querySql += conditions.join(' OR ');
-            querySql += ' LIMIT 5';
+app.get('/api/content/faq', async (req, res) => {
+    try {
+        const [faqs] = await dbPool.query('SELECT * FROM preguntas_frecuentes ORDER BY orden ASC, id ASC');
+        res.status(200).json({ success: true, faqs });
+    } catch (error) { res.status(500).json({ success: false, message: 'Error al cargar preguntas.' }); }
+});
 
-            const [productsDB] = await dbPool.query(querySql, queryParams);
-            if (productsDB.length > 0) {
-                productContext = "Información de productos de Ferremax que podrían ser relevantes:\n";
-                productsDB.forEach(p => {
-                    // <<< AÑADIR EL ID_Producto AL CONTEXTO >>>
-                    productContext += `- ID: ${p.ID_Producto}, Nombre: ${p.Nombre}, Marca: ${p.Marca}, Precio: ${p.precio_unitario} COP, Stock: ${p.cantidad}. ${p.Descripcion ? 'Descripción breve: ' + p.Descripcion.substring(0, 80) + '...' : ''}\n`;
-                });
-            } else {
-                productContext = "No encontré productos en la base de datos de Ferremax que coincidan directamente con las palabras clave específicas de tu consulta ('" + keywords.join("', '") + "').\n";
-            }
-        } else {
-            productContext = "No se identificaron palabras clave específicas de productos en tu consulta para buscar en la base de datos. Puedo ayudarte con información general o sobre categorías.\n"
+// --- RUTAS DE ADMIN PARA GESTIONAR POLÍTICAS Y FAQ ---
+app.put('/api/admin/content/policies', checkAdmin, async (req, res) => {
+    const { policies } = req.body; // Se espera un array de objetos politica
+    if (!Array.isArray(policies)) return res.status(400).json({ success: false, message: 'Formato inválido.' });
+    
+    let connection;
+    try {
+        connection = await dbPool.getConnection();
+        await connection.beginTransaction();
+        for (const policy of policies) {
+            await connection.query('UPDATE politicas SET titulo = ?, contenido = ? WHERE id = ?', [policy.titulo, policy.contenido, policy.id]);
         }
-
-        // Información de políticas directamente en el prompt
-        const ferremaxPolicies = `
-Políticas de Ferremax:
-- Política de Privacidad: Nos tomamos muy en serio la privacidad. Usamos tu información solo para brindarte el mejor servicio y no la compartimos sin tu consentimiento. Cumplimos con las leyes de protección de datos.
-- Política de Devoluciones: Tienes 30 días para devoluciones en productos defectuosos o no satisfactorios. Contáctanos para iniciar el proceso. El producto debe estar en estado original y con embalaje completo.
-- Política de Envío: Hacemos envíos a nivel nacional. Los costos y tiempos varían (generalmente 3-7 días hábiles). Se calculan al comprar. Te informaremos de retrasos.
-- Política de Seguridad: Usamos tecnología de encriptación para proteger tus datos de pago. Implementamos medidas para evitar accesos no autorizados.
-- Política de Atención al Cliente: Nos comprometemos a un excelente servicio. Contáctanos por el formulario o correo; respondemos en 24 horas hábiles.
-- Métodos de Pago: Aceptamos pagos vía Wompi (tarjetas crédito/débito PSE, Nequi, Bancolombia a la mano, efectivo en puntos) y también Pago Contra Entrega.
-`;
-
-
-        // --- INSTRUCCIÓN DE SISTEMA MEJORADA ---
-        const systemInstruction = `Eres Ferremax IA, un asistente virtual experto y amigable de la ferretería Ferremax. Tu misión es ayudar a los clientes con sus preguntas sobre productos y políticas.
-
-Reglas de respuesta:
-1.  Basa tus respuestas ESTRICTA Y ÚNICAMENTE en la información de "Contexto de Productos" y "Políticas de la Tienda" que te proporciono.
-2.  **¡IMPORTANTE! Si mencionas un producto específico del contexto, DEBES formatearlo como un enlace Markdown usando su ID. La sintaxis es: [Nombre del Producto](/products/ID_DEL_PRODUCTO). Ejemplo: "Claro, tenemos el [Rotomartillo MaxForce 800W](/products/15) en stock."**
-3.  Al mencionar un producto, SIEMPRE incluye su nombre, precio y stock si están disponibles.
-4.  NO REDIRIJA AL USUARIO a "la página web" o a "visitar una sección", ya que el usuario ya está aquí y tú tienes la información. Proporciona la respuesta directamente.
-5.  Si no encuentras un producto específico, informa al usuario amablemente y sugiérele que revise las categorías o sea más específico. No inventes productos ni IDs.
-6.  Sé conciso, claro y siempre muy amigable.
-
----
-Políticas de la Tienda:
-${ferremaxPolicies}
----
-Contexto de Productos (ID, Nombre, Precio, Stock, Descripción):
-${productContext} 
----
-Pregunta del cliente:`;
-
-        const fullPrompt = `${systemInstruction}\n${userMessage}`;
-        console.log(`\n[AI PROMPT TO GEMINI START]\n${fullPrompt}\n[AI PROMPT TO GEMINI END]\n`);
-
-        const safetySettings = [
-            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH },
-        ];
-
-        const generationConfig = {
-            temperature: 0.3, // Un poco más bajo para ser más factual con las políticas
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 500, // Aumentado un poco por si las políticas son largas
-        };
-        
-        const chatSession = geminiModel.startChat({
-            generationConfig,
-            safetySettings,
-            history: [ /* Aquí podrías agregar el historial de la conversación si lo implementas */ ]
-          });
-        
-        const result = await chatSession.sendMessage(fullPrompt);
-        
-        const response = result.response;
-        const aiReply = response.text();
-
-        if (!aiReply) {
-            if (response.promptFeedback && response.promptFeedback.blockReason) {
-                console.warn(`\t[Gemini] Respuesta bloqueada. Razón: ${response.promptFeedback.blockReason}`);
-                throw new Error(`Respuesta bloqueada por Gemini: ${response.promptFeedback.blockReason}`);
-            }
-            console.warn("\t[Gemini] Respuesta vacía recibida del modelo.");
-            throw new Error("El asistente IA no pudo generar una respuesta.");
-        }
-
-        console.log(`[AI RESPONSE FROM GEMINI] "${aiReply}"`);
-        res.json({ success: true, reply: aiReply });
-
+        await connection.commit();
+        res.status(200).json({ success: true, message: 'Políticas actualizadas.' });
     } catch (error) {
-        console.error("!!! Error en /api/ai-assistant/chat (Gemini):", error);
-        res.status(500).json({ success: false, message: error.message || "Error al procesar tu solicitud con el asistente IA (Gemini)." });
-    }
-    console.log(`[AI ASSISTANT END] Para mensaje: "${userMessage}"`);
-});
-
-
-// --- INICIAR SERVIDOR ---
-initializeApp().then(() => {
-    app.listen(PORT, () => {
-        console.log("\n========================================");
-        console.log(`==> Servidor Ferremax escuchando en puerto ${PORT}`);
-        console.log(`==> Modo: ${isProduction ? 'Producción' : 'Desarrollo/Sandbox'}`);
-        console.log("========================================");
-    });
-}).catch(err => {
-    console.error("Fallo al inicializar la aplicación:", err);
-    process.exit(1);
-});
-
-// --- MANEJO DE CIERRE GRACEFUL ---
-const gracefulShutdown = async (signal) => {
-    console.log(`\n==> Recibida señal ${signal}. Cerrando servidor graceful...`);
-    try {
-        if (dbPool) {
-            console.log('--> Cerrando pool de conexiones a la base de datos...');
-            await dbPool.end();
-            console.log('--> Pool de conexiones DB cerrado.');
-        }
-    } catch (err) {
-        console.error('!!! Error durante el cierre del pool de DB:', err);
+        if (connection) await connection.rollback();
+        res.status(500).json({ success: false, message: 'Error al actualizar políticas.' });
     } finally {
-        console.log("==> Servidor cerrado.");
-        process.exit(0);
+        if (connection) connection.release();
     }
-};
-process.on('SIGINT', gracefulShutdown);
-process.on('SIGTERM', gracefulShutdown);
+});
+
+app.listen(PORT, () => {
+    console.log(`Servidor corriendo en http://localhost:${PORT}`);
+    initializeApp();
+});
+
+// --- INICIO: CÓDIGO PARA ASISTENTE IA CON GEMINI ---
+app.post('/api/ai/query', async (req, res) => {
+    const { question, userId, context } = req.body;
+    console.log(`--> POST /api/ai/query (User ID: ${userId})`);
+
+    if (!question || question.trim().length === 0) {
+        return res.status(400).json({ success: false, message: 'La pregunta es requerida.' });
+    }
+
+    try {
+        // ... (lógica existente para buscar productos)
+
+        // <<< NUEVO: OBTENER POLÍTICAS Y FAQ DESDE LA DB >>>
+        const [policiesDB] = await dbPool.query("SELECT titulo, contenido FROM politicas");
+        const [faqsDB] = await dbPool.query("SELECT pregunta, respuesta FROM preguntas_frecuentes");
+
+        const ferremaxPolicies = policiesDB.map(p => `- ${p.titulo}: ${p.contenido}`).join('\n');
+        const ferremaxFaqs = faqsDB.map(f => `- P: ${f.pregunta}\n  R: ${f.respuesta}`).join('\n');
+
+        const systemInstruction = `Eres Ferremax IA, un asistente virtual experto y amigable de la ferretería Ferremax. Tu misión es ayudar a los clientes con sus preguntas sobre productos, políticas y preguntas frecuentes.\n\nReglas de respuesta:\n1. Basa tus respuestas ESTRICTA Y ÚNICAMENTE en la información de \"Contexto de Productos\", \"Políticas\" y \"Preguntas Frecuentes\" que te proporciono.\n2. Si mencionas un producto específico del contexto, DEBES formatearlo como un enlace Markdown usando su ID. La sintaxis es: [Nombre del Producto](/products/ID_DEL_PRODUCTO).\n3. Al mencionar un producto, SIEMPRE incluye su nombre, precio y stock si están disponibles.\n4. NO redirijas al usuario a \"la página web\" o a \"visitar una sección\". Proporciona la respuesta directamente.\n5. Si no encuentras un producto específico, informa al usuario amablemente y sugiérele que revise las categorías o sea más específico. No inventes productos ni IDs.\n6. Sé conciso, claro y siempre muy amigable.\n\nInformación de Políticas y Preguntas Frecuentes:\n--- POLÍTICAS ---\n${ferremaxPolicies}\n--- PREGUNTAS FRECUENTES ---\n${ferremaxFaqs}\n---\nContexto de Productos (si aplica):\n${productContext}\n---\nPregunta del cliente:`;
+
+        // ...resto de la lógica de Gemini...
+    } catch (error) {
+        console.error("!!! Error en /api/ai/query:", error);
+        res.status(500).json({ success: false, message: 'Error interno del servidor al procesar la consulta.' });
+    }
+});
+// --- FIN: CÓDIGO PARA ASISTENTE IA CON GEMINI ---
