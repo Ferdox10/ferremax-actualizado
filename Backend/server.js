@@ -636,7 +636,7 @@ app.post('/api/orders/cash-on-delivery', async (req, res) => {
         }
         const [pedidoResult] = await connection.query(
             `INSERT INTO pedidos (ID_Usuario, Total_Pedido, Estado_Pedido, Metodo_Pago, Nombre_Cliente_Envio, Direccion_Envio, Departamento_Envio, Ciudad_Envio, Punto_Referencia_Envio, Telefono_Cliente_Envio, Email_Cliente_Envio, Fecha_Pedido, ID_Cliente)
-             VALUES (?, ?, 'Pendiente de Confirmacion', 'ContraEntrega', ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
+             VALUES (?, ?, 'Pendiente de Confirmacion', 'ContraEntrega', ?, ?, ?, ?, ?, ?, NOW(), ?)`,
             [
                 customerInfo.userId || null, // CORRECCIÓN AQUÍ
                 totalPedido,
@@ -1033,89 +1033,49 @@ app.put('/api/admin/content/faq', checkAdmin, async (req, res) => {
     }
 });
 
-// --- INICIO: CÓDIGO PARA ASISTENTE IA CON GEMINI ---
-app.post('/api/ai/query', async (req, res) => {
-    const { question, userId, context } = req.body;
-    console.log(`--> POST /api/ai/query (User ID: ${userId})`);
+// --- INICIO DEL SERVIDOR (VERSIÓN CORREGIDA) ---
+let server; // Declarar la variable del servidor fuera del alcance de la función
 
-    if (!question || question.trim().length === 0) {
-        return res.status(400).json({ success: false, message: 'La pregunta es requerida.' });
-    }
-
-    try {
-        // ... (lógica existente para buscar productos)
-
-        // <<< NUEVO: OBTENER POLÍTICAS Y FAQ DESDE LA DB >>>
-        const [policiesDB] = await dbPool.query("SELECT titulo, contenido FROM politicas");
-        const [faqsDB] = await dbPool.query("SELECT pregunta, respuesta FROM preguntas_frecuentes");
-
-        const ferremaxPolicies = policiesDB.map(p => `- ${p.titulo}: ${p.contenido}`).join('\n');
-        const ferremaxFaqs = faqsDB.map(f => `- P: ${f.pregunta}\n  R: ${f.respuesta}`).join('\n');
-
-        const systemInstruction = `Eres Ferremax IA, un asistente virtual experto y amigable de la ferretería Ferremax. Tu misión es ayudar a los clientes con sus preguntas sobre productos, políticas y preguntas frecuentes.\n\nReglas de respuesta:\n1. Basa tus respuestas ESTRICTA Y ÚNICAMENTE en la información de \"Contexto de Productos\", \"Políticas\" y \"Preguntas Frecuentes\" que te proporciono.\n2. Si mencionas un producto específico del contexto, DEBES formatearlo como un enlace Markdown usando su ID. La sintaxis es: [Nombre del Producto](/products/ID_DEL_PRODUCTO).\n3. Al mencionar un producto, SIEMPRE incluye su nombre, precio y stock si están disponibles.\n4. NO redirijas al usuario a \"la página web\" o a \"visitar una sección\". Proporciona la respuesta directamente.\n5. Si no encuentras un producto específico, informa al usuario amablemente y sugiérele que revise las categorías o sea más específico. No inventes productos ni IDs.\n6. Sé conciso, claro y siempre muy amigable.\n\nInformación de Políticas y Preguntas Frecuentes:\n--- POLÍTICAS ---\n${ferremaxPolicies}\n--- PREGUNTAS FRECUENTES ---\n${ferremaxFaqs}\n---\nContexto de Productos (si aplica):\n${productContext}\n---\nPregunta del cliente:`;
-
-        // ...resto de la lógica de Gemini...
-    } catch (error) {
-        console.error("!!! Error en /api/ai/query:", error);
-        res.status(500).json({ success: false, message: 'Error interno del servidor al procesar la consulta.' });
-    }
+initializeApp().then(() => {
+    // La variable PORT es leída de las variables de entorno de Render, o usa 4000 si no existe (para desarrollo local)
+    const portToListen = process.env.PORT || 4000;
+    
+    server = app.listen(portToListen, () => {
+        console.log("\n========================================");
+        console.log(`==> Servidor Ferremax escuchando en puerto ${portToListen}`);
+        console.log(`==> Modo: ${isProduction ? 'Producción' : 'Desarrollo/Sandbox'}`);
+        console.log("========================================");
+    });
+}).catch(err => {
+    console.error("Fallo CRÍTICO al inicializar la aplicación. El servidor no arrancará.", err);
+    process.exit(1); // Salir si la inicialización (ej. conexión a DB) falla
 });
-// --- FIN: CÓDIGO PARA ASISTENTE IA CON GEMINI ---
 
-// --- RUTA DEL ASISTENTE IA (GEMINI) ---
-app.post('/api/ai-assistant/chat', async (req, res) => {
-    const userMessage = req.body.message;
-    console.log(`\n[AI ASSISTANT START] User message: "${userMessage}"`);
-
-    if (!userMessage) {
-        return res.status(400).json({ success: false, message: "Mensaje vacío." });
-    }
-    if (!geminiModel) {
-        return res.status(503).json({ success: false, message: "Asistente IA no disponible." });
-    }
-    if (!dbPool) {
-        return res.status(500).json({ success: false, message: "Error interno: Conexión a BD no disponible." });
-    }
-
-    try {
-        const [policiesDB] = await dbPool.query("SELECT titulo, contenido FROM politicas");
-        const [faqsDB] = await dbPool.query("SELECT pregunta, respuesta FROM preguntas_frecuentes");
-        const [productsDB] = await dbPool.query("SELECT ID_Producto, Nombre, Descripcion, precio_unitario, cantidad, Marca FROM producto LIMIT 10");
-
-        const productContext = productsDB.map(p => `- ID:${p.ID_Producto}, Nombre:${p.Nombre}, Precio:${p.precio_unitario}, Stock:${p.cantidad}`).join('\n');
-        const ferremaxPolicies = policiesDB.map(p => `- ${p.titulo}: ${p.contenido}`).join('\n');
-        const ferremaxFaqs = faqsDB.map(f => `- P: ${f.pregunta}\n  R: ${f.respuesta}`).join('\n');
-
-        const systemInstruction = `Eres Ferremax IA, un asistente experto de la ferretería Ferremax. Responde amistosamente y basa tus respuestas ESTRICTAMENTE en la información proporcionada. Si mencionas un producto, formatea un enlace Markdown: [Nombre del Producto](/products/ID_DEL_PRODUCTO).
-
----
-Políticas:
-${ferremaxPolicies}
----
-FAQ:
-${ferremaxFaqs}
----
-Contexto de Productos:
-${productContext}
----
-Pregunta del cliente:`;
-
-        const fullPrompt = `${systemInstruction}\n${userMessage}`;
+// --- MANEJO DE CIERRE GRACEFUL (CORREGIDO) ---
+const gracefulShutdown = (signal) => {
+    console.log(`\n==> Recibida señal ${signal}. Cerrando servidor graceful...`);
+    
+    // 1. Dejar de aceptar nuevas conexiones
+    server.close(async () => {
+        console.log('--> Servidor HTTP cerrado.');
         
-        const chatSession = geminiModel.startChat({ /* ... config ... */ });
-        const result = await chatSession.sendMessage(fullPrompt);
-        const response = result.response;
-        const aiReply = response.text();
-
-        if (!aiReply) {
-            throw new Error("El asistente no pudo generar una respuesta.");
+        // 2. Cerrar la conexión a la base de datos
+        try {
+            if (dbPool) {
+                console.log('--> Cerrando pool de conexiones a la base de datos...');
+                await dbPool.end();
+                console.log('--> Pool de conexiones DB cerrado.');
+            }
+        } catch (err) {
+            console.error('!!! Error durante el cierre del pool de DB:', err);
+        } finally {
+            // 3. Salir del proceso
+            console.log("==> Servidor cerrado exitosamente.");
+            process.exit(0);
         }
+    });
+};
 
-        console.log(`[AI RESPONSE] "${aiReply}"`);
-        res.json({ success: true, reply: aiReply });
-
-    } catch (error) {
-        console.error("!!! Error en /api/ai-assistant/chat:", error);
-        res.status(500).json({ success: false, message: error.message });
-    }
-});
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+// --- FIN: CÓDIGO PARA ASISTENTE IA CON GEMINI ---
