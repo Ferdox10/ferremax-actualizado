@@ -668,6 +668,58 @@ app.post('/api/orders/cash-on-delivery', async (req, res) => {
     }
 });
 
+// ------------------------------------------------------
+// --- RUTA PARA OBTENER TASA DE CAMBIO EN TIEMPO REAL ---
+// ------------------------------------------------------
+app.get('/api/currency/rate', async (req, res) => {
+    console.log("--> GET /api/currency/rate: Solicitando tasa de cambio.");
+
+    const apiKey = process.env.EXCHANGERATE_API_KEY;
+
+    // 1. Verificar si la clave de API existe en las variables de entorno
+    if (!apiKey) {
+        console.error("!!! ERROR FATAL: La variable de entorno EXCHANGERATE_API_KEY no está configurada.");
+        return res.status(500).json({ 
+            success: false, 
+            message: 'Servicio de conversión no configurado en el servidor.',
+            fallbackRate: 4000 // Devolver una tasa de respaldo
+        });
+    }
+    
+    console.log("\tClave de API de tasa de cambio encontrada. Llamando a la API externa...");
+    const apiUrl = `https://v6.exchangerate-api.com/v6/${apiKey}/latest/USD`;
+
+    try {
+        // 2. Hacer la petición a la API externa con axios
+        const response = await axios.get(apiUrl);
+        
+        // 3. Verificar si la respuesta de la API externa fue exitosa
+        if (response.data && response.data.result === 'success') {
+            const rateCOP = response.data.conversion_rates.COP;
+
+            if (!rateCOP) {
+                throw new Error("La moneda COP no fue encontrada en la respuesta de la API externa.");
+            }
+            
+            console.log(`\t<-- ÉXITO: Tasa de cambio obtenida: 1 USD = ${rateCOP} COP`);
+            // 4. Enviar la tasa al frontend
+            res.status(200).json({ success: true, rate: rateCOP });
+        } else {
+            // La API de ExchangeRate respondió pero con un error interno de ellos
+            throw new Error(`La API de tasa de cambio respondió con un error: ${response.data['error-type']}`);
+        }
+
+    } catch (error) {
+        console.error("!!! ERROR al contactar la API de tasa de cambio:", error.message);
+        // Si todo lo demás falla, devolvemos un error y una tasa de respaldo
+        res.status(500).json({ 
+            success: false, 
+            message: 'No se pudo obtener la tasa en tiempo real.', 
+            fallbackRate: 4000 
+        });
+    }
+});
+
 // --- RUTAS DE ADMINISTRACIÓN ---
 app.get('/api/admin/products', checkAdmin, async (req, res) => {
     try { if (!dbPool) throw new Error("dbPool no inicializado en admin/products"); const [r] = await dbPool.query('SELECT * FROM producto ORDER BY ID_Producto ASC'); res.status(200).json(r); } 
