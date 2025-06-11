@@ -14,7 +14,7 @@ require('dotenv').config();
 const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require("@google/generative-ai");
 const nodemailer = require('nodemailer');
 const paypal = require('@paypal/checkout-server-sdk');
-const axios = require('axios'); // Asegúrate de tener esta importación al principio
+const axios = require('axios'); // Asegúrate de que esta importación esté al principio
 
 // --- CONFIGURACIÓN GENERAL ---
 const app = express();
