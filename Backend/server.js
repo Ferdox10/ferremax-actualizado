@@ -822,20 +822,51 @@ app.delete('/api/admin/content/faq/:id', checkAdmin, async (req, res) => {
     res.status(200).json({ success: true });
 });
 
-// --- EDITAR ROL DE USUARIO ---
+// --- RUTA PARA EDITAR EL ROL DE UN USUARIO ---
 app.patch('/api/admin/users/:id/role', checkAdmin, async (req, res) => {
+    const { id } = req.params;
     const { role } = req.body;
-    if (!['admin', 'cliente'].includes(role)) return res.status(400).json({ message: 'Rol no válido.' });
-    await dbPool.query('UPDATE usuarios SET role = ? WHERE id = ?', [role, req.params.id]);
-    res.status(200).json({ success: true });
+    
+    // Validación para asegurarse de que el rol sea uno de los permitidos
+    if (!['admin', 'cliente'].includes(role)) {
+        return res.status(400).json({ success: false, message: 'Rol no válido.' });
+    }
+
+    try {
+        const [result] = await dbPool.query('UPDATE usuarios SET role = ? WHERE id = ?', [role, id]);
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Usuario no encontrado.' });
+        }
+        res.status(200).json({ success: true, message: 'Rol de usuario actualizado.' });
+    } catch (error) {
+        console.error("Error al actualizar el rol del usuario:", error);
+        res.status(500).json({ success: false, message: 'Error al actualizar el rol.' });
+    }
 });
 
-// --- ELIMINAR USUARIO ---
+// --- RUTA PARA ELIMINAR UN USUARIO ---
 app.delete('/api/admin/users/:id', checkAdmin, async (req, res) => {
-    // ¡CUIDADO! Borrar usuarios puede romper relaciones en la tabla de pedidos.
-    // Una mejor estrategia sería "desactivarlos". Por ahora, implementamos el borrado.
-    await dbPool.query('DELETE FROM usuarios WHERE id = ?', [req.params.id]);
-    res.status(200).json({ success: true });
+    const { id } = req.params;
+    console.log(`Intentando eliminar usuario con ID: ${id}`);
+    
+    // ¡ADVERTENCIA DE SEGURIDAD! No permitir que un admin se borre a sí mismo.
+    // Esto requeriría saber el ID del admin que hace la petición (lo cual haríamos con un token JWT).
+    // Por ahora, lo dejamos así, pero es una mejora importante para el futuro.
+
+    try {
+        const [result] = await dbPool.query('DELETE FROM usuarios WHERE id = ?', [id]);
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ success: false, message: 'Usuario no encontrado.' });
+        }
+        res.status(200).json({ success: true, message: 'Usuario eliminado correctamente.' });
+    } catch (error) {
+        console.error("Error al eliminar el usuario:", error);
+        // Manejar el caso de que el usuario tenga pedidos asociados
+        if (error.code === 'ER_ROW_IS_REFERENCED_2') {
+             return res.status(409).json({ success: false, message: 'No se puede eliminar: el usuario tiene pedidos asociados. Considere desactivarlo en su lugar.' });
+        }
+        res.status(500).json({ success: false, message: 'Error al eliminar el usuario.' });
+    }
 });
 
 // --- CONFIGURACIÓN DE NODEMAILER (después de las configs de wompi, gemini, etc.) ---
