@@ -749,30 +749,93 @@ app.put('/api/admin/orders/:id/status', checkAdmin, async (req,res)=>{
         res.status(200).json({success:true,message:'Estado actualizado.'});
     }catch(e){ console.error("Error PUT admin/orders/:id/status:",e); res.status(500).json({success:false,message:e.message});}
 });
-app.get('/api/admin/analytics/sales-overview', checkAdmin, async (req,res)=>{
-    try{ if (!dbPool) throw new Error("dbPool no inicializado");
-        const [ds]=await dbPool.query(`SELECT DATE_FORMAT(Fecha_Pedido,'%Y-%m-%d') as dia, SUM(Total_Pedido) as total_ventas FROM pedidos WHERE Estado_Pedido IN ('Pagado','Entregado','Enviado') AND Fecha_Pedido >= CURDATE()-INTERVAL 30 DAY GROUP BY DATE_FORMAT(Fecha_Pedido,'%Y-%m-%d') ORDER BY dia ASC`);
-        const [tp]=await dbPool.query(`SELECT p.Nombre, SUM(dp.Cantidad) as total_vendido FROM detalles_pedido dp JOIN producto p ON dp.ID_Producto=p.ID_Producto JOIN pedidos ped ON dp.ID_Pedido=ped.ID_Pedido WHERE ped.Estado_Pedido IN ('Pagado','Entregado','Enviado') GROUP BY dp.ID_Producto,p.Nombre ORDER BY total_vendido DESC LIMIT 10`);
-        res.status(200).json({dailySales:ds,topProducts:tp});
-    }catch(e){ console.error("Error GET admin/analytics/sales:",e); res.status(500).json({success:false,message:e.message});}
+
+// --- RUTA DE ANALÍTICAS CORREGIDA ---
+app.get('/api/admin/analytics/sales-overview', checkAdmin, async (req, res) => {
+    try {
+        // Usamos COALESCE para asegurar que si no hay ventas, devuelva 0 en lugar de NULL
+        const [salesData] = await dbPool.query(
+            `SELECT 
+                COALESCE(SUM(CASE WHEN Fecha_Pedido >= CURDATE() - INTERVAL 30 DAY THEN Total_Pedido ELSE 0 END), 0) as totalSales30Days,
+                (SELECT COUNT(*) FROM pedidos) as totalOrders,
+                (SELECT COUNT(*) FROM usuarios) as totalUsers
+             FROM pedidos 
+             WHERE Estado_Pedido IN ('Pagado', 'Entregado', 'Enviado')`
+        );
+
+        const [dailySales] = await dbPool.query(
+            `SELECT DATE_FORMAT(Fecha_Pedido, '%Y-%m-%d') as dia, SUM(Total_Pedido) as total_ventas
+             FROM pedidos
+             WHERE Estado_Pedido IN ('Pagado', 'Entregado', 'Enviado') AND Fecha_Pedido >= CURDATE() - INTERVAL 30 DAY
+             GROUP BY dia ORDER BY dia ASC`
+        );
+
+        const [topProducts] = await dbPool.query(
+            `SELECT p.Nombre, SUM(dp.Cantidad) as total_vendido
+             FROM detalles_pedido dp
+             JOIN producto p ON dp.ID_Producto = p.ID_Producto
+             JOIN pedidos ped ON dp.ID_Pedido = ped.ID_Pedido
+             WHERE ped.Estado_Pedido IN ('Pagado', 'Entregado', 'Enviado')
+             GROUP BY p.ID_Producto, p.Nombre ORDER BY total_vendido DESC LIMIT 5`
+        );
+
+        res.status(200).json({ 
+            kpis: salesData[0], // Key Performance Indicators
+            dailySales, 
+            topProducts 
+        });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
-app.get('/api/admin/analytics/product-views', checkAdmin, async (req,res)=>{
-    try{ if (!dbPool) throw new Error("dbPool no inicializado");
-        const [pv]=await dbPool.query(`SELECT p.Nombre, COUNT(vp.ID_Vista) as total_vistas FROM vistas_producto vp JOIN producto p ON vp.ID_Producto=p.ID_Producto GROUP BY vp.ID_Producto,p.Nombre ORDER BY total_vistas DESC LIMIT 20`);
-        res.status(200).json(pv);
-    }catch(e){ console.error("Error GET admin/analytics/views:",e); res.status(500).json({success:false,message:e.message});}
+
+// --- RUTA DE VISTAS DE PRODUCTO CORREGIDA ---
+app.get('/api/admin/analytics/product-views', checkAdmin, async (req, res) => {
+    try {
+        const [productViews] = await dbPool.query(
+            `SELECT p.Nombre, COUNT(vp.ID_Vista) as total_vistas
+             FROM vistas_producto vp
+             JOIN producto p ON vp.ID_Producto = p.ID_Producto
+             GROUP BY p.ID_Producto, p.Nombre ORDER BY total_vistas DESC LIMIT 10`
+        );
+        res.status(200).json({ success: true, views: productViews });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
-app.get('/api/admin/orders/pending-count', checkAdmin, async (req,res)=>{
-    try{ if (!dbPool) throw new Error("dbPool no inicializado");
-        const [r]=await dbPool.query("SELECT COUNT(*) as pendingCount FROM pedidos WHERE Estado_Pedido IN ('Pendiente de Confirmacion','Pagado')");
-        res.status(200).json({success:true,pendingCount:r[0]?.pendingCount||0});
-    }catch(e){ console.error("Error GET admin/orders/pending:",e); res.status(500).json({success:false,message:e.message});}
+
+// --- CRUD PARA POLÍTICAS ---
+app.post('/api/admin/content/policies', checkAdmin, async (req, res) => {
+    const { titulo, contenido } = req.body;
+    const [result] = await dbPool.query('INSERT INTO politicas (titulo, contenido) VALUES (?, ?)', [titulo, contenido]);
+    res.status(201).json({ success: true, id: result.insertId });
 });
-app.get('/api/admin/contact-messages', checkAdmin, async (req, res) => {
-    try { if (!dbPool) throw new Error("dbPool no inicializado");
-        const [messages] = await dbPool.query('SELECT id, name, email, subject, LEFT(message, 100) as message_preview, created_at FROM contact_messages ORDER BY created_at DESC');
-        res.status(200).json(messages);
-    } catch (error) { console.error("Error GET admin/contact-messages:",error); res.status(500).json({ success: false, message: error.message }); }
+app.delete('/api/admin/content/policies/:id', checkAdmin, async (req, res) => {
+    await dbPool.query('DELETE FROM politicas WHERE id = ?', [req.params.id]);
+    res.status(200).json({ success: true });
+});
+
+// --- CRUD PARA FAQ ---
+app.post('/api/admin/content/faq', checkAdmin, async (req, res) => {
+    const { pregunta, respuesta } = req.body;
+    const [result] = await dbPool.query('INSERT INTO preguntas_frecuentes (pregunta, respuesta) VALUES (?, ?)', [pregunta, respuesta]);
+    res.status(201).json({ success: true, id: result.insertId });
+});
+app.delete('/api/admin/content/faq/:id', checkAdmin, async (req, res) => {
+    await dbPool.query('DELETE FROM preguntas_frecuentes WHERE id = ?', [req.params.id]);
+    res.status(200).json({ success: true });
+});
+
+// --- EDITAR ROL DE USUARIO ---
+app.patch('/api/admin/users/:id/role', checkAdmin, async (req, res) => {
+    const { role } = req.body;
+    if (!['admin', 'cliente'].includes(role)) return res.status(400).json({ message: 'Rol no válido.' });
+    await dbPool.query('UPDATE usuarios SET role = ? WHERE id = ?', [role, req.params.id]);
+    res.status(200).json({ success: true });
+});
+
+// --- ELIMINAR USUARIO ---
+app.delete('/api/admin/users/:id', checkAdmin, async (req, res) => {
+    // ¡CUIDADO! Borrar usuarios puede romper relaciones en la tabla de pedidos.
+    // Una mejor estrategia sería "desactivarlos". Por ahora, implementamos el borrado.
+    await dbPool.query('DELETE FROM usuarios WHERE id = ?', [req.params.id]);
+    res.status(200).json({ success: true });
 });
 
 // --- CONFIGURACIÓN DE NODEMAILER (después de las configs de wompi, gemini, etc.) ---
@@ -937,11 +1000,6 @@ app.put('/api/admin/content/faq', checkAdmin, async (req, res) => {
     } finally {
         if (connection) connection.release();
     }
-});
-
-app.listen(PORT, () => {
-    console.log(`Servidor corriendo en http://localhost:${PORT}`);
-    initializeApp();
 });
 
 // --- INICIO: CÓDIGO PARA ASISTENTE IA CON GEMINI ---
