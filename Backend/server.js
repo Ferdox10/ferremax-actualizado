@@ -14,6 +14,7 @@ require('dotenv').config();
 const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require("@google/generative-ai");
 const nodemailer = require('nodemailer');
 const paypal = require('@paypal/checkout-server-sdk');
+const axios = require('axios'); // Asegúrate de tener esta importación al principio
 
 // --- CONFIGURACIÓN GENERAL ---
 const app = express();
@@ -1160,7 +1161,7 @@ app.post('/api/paypal/capture-order', checkAdmin, async (req, res) => { // check
             const clienteId = await getOrCreateClienteId(connection, { username: shippingDetails.name, email: shippingDetails.email });
 
             const [pedidoResult] = await connection.query(
-                `INSERT INTO pedidos (ID_Usuario, Total_Pedido, Estado_Pedido, Metodo_Pago, Referencia_Pago, Nombre_Cliente_Envio, Direccion_Envio, Departamento_Envio, Ciudad_Envio, Punto_Referencia_Envio, Telefono_Cliente_Envio, Email_Cliente_Envio, Fecha_Pedido, ID_Cliente) VALUES (?, ?, 'Pagado', 'PayPal', ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
+                `INSERT INTO pedidos (ID_Usuario, Total_Pedido, Estado_Pedido, Metodo_Pago, Referencia_Pago, Nombre_Cliente_Envio, Direccion_Envio, Departamento_Envio, Ciudad_Envio, Punto_Referencia_Envio, Telefono_Cliente_Envio, Email_Cliente_Envio, Fecha_Pedido, ID_Cliente) VALUES (?, ?, 'Pagado', 'PayPal', ?, ?, ?, ?, ?, ?, NOW(), ?)`,
                 [userId || null, totalPedido, orderID, shippingDetails.name, shippingDetails.address, shippingDetails.department, shippingDetails.city, shippingDetails.referencePoint || null, shippingDetails.phone, shippingDetails.email, clienteId]
             );
             
