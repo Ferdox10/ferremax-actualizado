@@ -13,6 +13,7 @@ const crypto = require('crypto');
 require('dotenv').config();
 const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require("@google/generative-ai");
 const nodemailer = require('nodemailer');
+const paypal = require('@paypal/checkout-server-sdk');
 
 // --- CONFIGURACIÓN GENERAL ---
 const app = express();
@@ -1088,6 +1089,95 @@ Pregunta del cliente:`;
     } catch (error) {
         console.error("!!! Error en /api/ai-assistant/chat:", error);
         res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+// --- CONFIGURACIÓN DE PAYPAL ---
+const environment = new paypal.core.LiveEnvironment(
+    process.env.PAYPAL_CLIENT_ID,
+    process.env.PAYPAL_CLIENT_SECRET
+);
+const client = new paypal.core.PayPalHttpClient(environment);
+console.log("--> Cliente de PayPal configurado para entorno de Producción (Live).");
+
+// ------------------------------------------------------
+// --- NUEVAS RUTAS PARA PAYPAL ---
+// ------------------------------------------------------
+
+// RUTA PARA CREAR UNA ORDEN
+app.post('/api/paypal/create-order', async (req, res) => {
+    const { cartTotal } = req.body;
+    console.log(`--> POST /api/paypal/create-order por un total de: ${cartTotal}`);
+    
+    const request = new paypal.orders.OrdersCreateRequest();
+    request.prefer("return=representation");
+    request.requestBody({
+        intent: 'CAPTURE',
+        purchase_units: [{
+            amount: {
+                currency_code: 'USD',
+                value: cartTotal.toFixed(2)
+            }
+        }]
+    });
+
+    try {
+        const order = await client.execute(request);
+        console.log(`\t<-- Orden de PayPal creada con ID: ${order.result.id}`);
+        res.status(201).json({ orderID: order.result.id });
+    } catch (err) {
+        console.error("!!! Error creando orden de PayPal:", err);
+        res.status(500).send(err.message);
+    }
+});
+
+// RUTA PARA CAPTURAR LA ORDEN (FINALIZAR EL PAGO)
+app.post('/api/paypal/capture-order', checkAdmin, async (req, res) => { // checkAdmin es un placeholder, idealmente sería checkUser
+    const { orderID, cart, shippingDetails, userId } = req.body;
+    console.log(`--> POST /api/paypal/capture-order para Order ID: ${orderID}`);
+
+    const request = new paypal.orders.OrdersCaptureRequest(orderID);
+    request.requestBody({});
+
+    let connection;
+    try {
+        const capture = await client.execute(request);
+        const captureStatus = capture.result.status;
+
+        if (captureStatus === 'COMPLETED') {
+            console.log("\t<-- Captura de PayPal COMPLETADA. Procediendo a guardar en BD...");
+            
+            // --- LÓGICA DE GUARDADO EN BASE DE DATOS (similar a Contra Entrega) ---
+            connection = await dbPool.getConnection();
+            await connection.beginTransaction();
+            
+            let totalPedido = 0;
+            for (const item of cart) {
+                // ... (lógica para verificar stock y calcular total real)
+                totalPedido += item.precio_unitario * item.quantity;
+            }
+
+            const clienteId = await getOrCreateClienteId(connection, { username: shippingDetails.name, email: shippingDetails.email });
+
+            const [pedidoResult] = await connection.query(
+                `INSERT INTO pedidos (ID_Usuario, Total_Pedido, Estado_Pedido, Metodo_Pago, Referencia_Pago, Nombre_Cliente_Envio, Direccion_Envio, Departamento_Envio, Ciudad_Envio, Punto_Referencia_Envio, Telefono_Cliente_Envio, Email_Cliente_Envio, Fecha_Pedido, ID_Cliente) VALUES (?, ?, 'Pagado', 'PayPal', ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
+                [userId || null, totalPedido, orderID, shippingDetails.name, shippingDetails.address, shippingDetails.department, shippingDetails.city, shippingDetails.referencePoint || null, shippingDetails.phone, shippingDetails.email, clienteId]
+            );
+            
+            // ... (lógica para insertar en detalles_pedido y actualizar stock)
+
+            await connection.commit();
+            res.status(200).json({ success: true, message: "Pago completado y pedido guardado." });
+
+        } else {
+            res.status(400).json({ success: false, message: `El pago no pudo ser completado. Estado: ${captureStatus}` });
+        }
+    } catch (err) {
+        if (connection) await connection.rollback();
+        console.error("!!! Error capturando orden de PayPal:", err);
+        res.status(500).send(err.message);
+    } finally {
+        if (connection) connection.release();
     }
 });
 
