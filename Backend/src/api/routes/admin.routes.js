@@ -23,6 +23,7 @@ router.get('/messages', checkAdmin, adminController.getAdminMessages);
 router.patch('/messages/:id/status', checkAdmin, adminController.updateMessageStatus);
 router.patch('/messages/:id/star', checkAdmin, adminController.starMessage);
 router.delete('/messages/:id', checkAdmin, adminController.deleteMessage);
+router.post('/reply-message', checkAdmin, adminController.replyMessage);
 // Políticas y FAQ admin
 router.post('/content/policies', checkAdmin, adminController.createPolicy);
 router.delete('/content/policies/:id', checkAdmin, adminController.deletePolicy);

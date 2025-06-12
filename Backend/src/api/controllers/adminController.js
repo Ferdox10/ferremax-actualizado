@@ -1,6 +1,7 @@
 // Controlador para rutas de admin (vacío por ahora)
 
 const { dbPool } = require('../../config/database');
+const transporter = require('../../config/nodemailer');
 
 const getAdminProducts = async (req, res) => {
     try { const [r] = await dbPool.query('SELECT * FROM producto ORDER BY ID_Producto ASC'); res.status(200).json(r); } 
@@ -105,6 +106,34 @@ const deleteMessage = async (req, res) => {
         res.status(500).json({ success: false, message: 'Error al eliminar el mensaje.' });
     }
 };
+const replyMessage = async (req, res) => {
+    const { recipientEmail, subject, body } = req.body;
+    if (!transporter) {
+        return res.status(503).json({ success: false, message: 'El servicio de correo no está configurado en el servidor.' });
+    }
+    if (!recipientEmail || !subject || !body) {
+        return res.status(400).json({ success: false, message: 'Faltan datos para enviar la respuesta.' });
+    }
+    const mailOptions = {
+        from: `"Ferremax" <${process.env.GMAIL_USER}>`,
+        to: recipientEmail,
+        subject: `Re: ${subject}`,
+        html: `
+            <p>Hola,</p>
+            <p>Gracias por contactar a Ferremax. Aquí tienes la respuesta a tu consulta:</p>
+            <blockquote style="border-left: 2px solid #ccc; padding-left: 1em; margin-left: 1em; color: #555;">
+                ${body}
+            </blockquote>
+            <p>Saludos,<br>El equipo de Ferremax</p>
+        `,
+    };
+    try {
+        await transporter.sendMail(mailOptions);
+        res.status(200).json({ success: true, message: 'Respuesta enviada con éxito.' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error al enviar el correo.' });
+    }
+};
 
 // Políticas y FAQ admin
 const createPolicy = async (req, res) => {
@@ -183,5 +212,6 @@ module.exports = {
   createFaq,
   deleteFaq,
   updatePolicies,
-  updateFaqs
+  updateFaqs,
+  replyMessage
 };
