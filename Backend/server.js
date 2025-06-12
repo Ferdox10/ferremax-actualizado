@@ -1293,6 +1293,7 @@ const gracefulShutdown = (signal) => {
                 console.log('--> Pool de conexiones DB cerrado.');
             }
 
+
         } catch (err) {
             console.error('!!! Error durante el cierre del pool de DB:', err);
         } finally {
@@ -1306,3 +1307,31 @@ const gracefulShutdown = (signal) => {
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 // --- FIN: CÓDIGO PARA ASISTENTE IA CON GEMINI ---
+app.get('/api/products/featured', async (req, res) => {
+    console.log("--> GET /api/products/featured (más vistos)");
+    try {
+        const sql = `
+            SELECT 
+                p.*, 
+                COALESCE(r.avg_rating, 0) as average_rating, 
+                COALESCE(r.review_count, 0) as review_count
+            FROM 
+                vistas_producto vp
+            JOIN 
+                producto p ON vp.ID_Producto = p.ID_Producto
+            LEFT JOIN 
+                (SELECT ID_Producto, AVG(Calificacion) as avg_rating, COUNT(*) as review_count FROM reseñas GROUP BY ID_Producto) r 
+            ON p.ID_Producto = r.ID_Producto
+            GROUP BY 
+                p.ID_Producto
+            ORDER BY 
+                COUNT(vp.ID_Vista) DESC
+            LIMIT 4;
+        `;
+        const [results] = await dbPool.query(sql);
+        res.status(200).json(results);
+    } catch (error) {
+        console.error('!!! Error GET /api/products/featured:', error);
+        res.status(500).json({ success: false, message: 'Error al obtener productos destacados.' });
+    }
+});
