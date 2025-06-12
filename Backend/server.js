@@ -635,59 +635,81 @@ app.post('/api/wompi/webhook', async (req, res) => {
 app.post('/api/orders/cash-on-delivery', async (req, res) => {
     console.log("--> POST /api/orders/cash-on-delivery");
     const { cart, customerInfo } = req.body;
+    
+    // Validación de datos de entrada
     if (!cart || cart.length === 0 || !customerInfo || !customerInfo.name || !customerInfo.phone || !customerInfo.address || !customerInfo.department || !customerInfo.city || !customerInfo.email) {
         return res.status(400).json({ success: false, message: "Faltan datos del carrito o del cliente." });
     }
+
     let connection;
     try {
         connection = await dbPool.getConnection();
         await connection.beginTransaction();
+        console.log("\tIniciando transacción para pedido contra entrega...");
+
+        // 1. Verificar stock y calcular total real desde la DB
         let totalPedido = 0;
         for (const item of cart) {
             const [productDB] = await connection.query('SELECT Nombre, precio_unitario, cantidad FROM producto WHERE ID_Producto = ? FOR UPDATE', [item.productId]);
             if (productDB.length === 0) throw new Error(`Producto ID ${item.productId} no encontrado.`);
             if (productDB[0].cantidad < item.quantity) {
-                throw new Error(`Stock insuficiente para ${productDB[0].Nombre}. Disponible: ${productDB[0].cantidad}, Solicitado: ${item.quantity}.`);
+                throw new Error(`Stock insuficiente para ${productDB[0].Nombre}.`);
             }
-            item.price = productDB[0].precio_unitario;
+            item.price = productDB[0].precio_unitario; // Usar siempre el precio de la DB
             totalPedido += item.price * item.quantity;
         }
 
-        // Lógica para obtener ID_Cliente unificada y robusta
-        let clienteId = null;
-        const customerEmail = customerInfo.email;
-        const customerName = customerInfo.name;
-        clienteId = await getOrCreateClienteId(connection, { username: customerName, email: customerEmail });
+        // 2. Obtener/Crear el ID del cliente
+        const clienteId = await getOrCreateClienteId(connection, { username: customerInfo.name, email: customerInfo.email });
         if (!clienteId) {
-            throw new Error(`No se pudo crear o encontrar un ID de cliente para el email ${customerEmail}`);
+            throw new Error(`No se pudo crear o encontrar un ID de cliente para el email ${customerInfo.email}`);
         }
+
+        // 3. Insertar el pedido en la tabla 'pedidos' (CONSULTA CORREGIDA)
         const [pedidoResult] = await connection.query(
-            `INSERT INTO pedidos (ID_Usuario, Total_Pedido, Estado_Pedido, Metodo_Pago, Nombre_Cliente_Envio, Direccion_Envio, Departamento_Envio, Ciudad_Envio, Punto_Referencia_Envio, Telefono_Cliente_Envio, Email_Cliente_Envio, Fecha_Pedido, ID_Cliente)
-             VALUES (?, ?, 'Pendiente de Confirmacion', 'ContraEntrega', ?, ?, ?, ?, ?, ?, NOW(), ?)`,
+            `INSERT INTO pedidos (
+                ID_Usuario, Total_Pedido, Estado_Pedido, Metodo_Pago, 
+                Nombre_Cliente_Envio, Direccion_Envio, Departamento_Envio, 
+                Ciudad_Envio, Punto_Referencia_Envio, Telefono_Cliente_Envio, 
+                Email_Cliente_Envio, Fecha_Pedido, ID_Cliente
+             ) VALUES (?, ?, 'Pendiente de Confirmacion', 'ContraEntrega', ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
             [
-                customerInfo.userId || null, // CORRECCIÓN AQUÍ
+                customerInfo.userId || null,
                 totalPedido,
                 customerInfo.name,
                 customerInfo.address,
                 customerInfo.department,
                 customerInfo.city,
-                customerInfo.referencePoint || null,
+                customerInfo.complement || null, // Usamos 'complement' del form
                 customerInfo.phone,
-                customerInfo.email,
+                customerInfo.email, // <<< VALOR AÑADIDO QUE FALTABA
                 clienteId
             ]
         );
         const pedidoId = pedidoResult.insertId;
+        console.log(`\tPedido contra entrega ID ${pedidoId} creado exitosamente.`);
+
+        // 4. Insertar detalles y actualizar stock
         for (const item of cart) {
-            await connection.query('INSERT INTO detalles_pedido (ID_Pedido, ID_Producto, Cantidad, Precio_Unitario_Compra) VALUES (?, ?, ?, ?)', [pedidoId, item.productId, item.quantity, item.price]);
-            await connection.query('UPDATE producto SET cantidad = cantidad - ? WHERE ID_Producto = ?', [item.quantity, item.productId]);
+            await connection.query(
+                'INSERT INTO detalles_pedido (ID_Pedido, ID_Producto, Cantidad, Precio_Unitario_Compra) VALUES (?, ?, ?, ?)', 
+                [pedidoId, item.productId, item.quantity, item.price]
+            );
+            await connection.query(
+                'UPDATE producto SET cantidad = GREATEST(0, cantidad - ?) WHERE ID_Producto = ?', 
+                [item.quantity, item.productId]
+            );
         }
+        
+        // 5. Finalizar la transacción
         await connection.commit();
-        res.status(201).json({ success: true, message: "Pedido contra entrega recibido.", orderId: pedidoId });
+        console.log(`\tCommit exitoso. Pedido ID ${pedidoId} guardado y stock actualizado.`);
+        res.status(201).json({ success: true, message: "Pedido contra entrega recibido exitosamente.", orderId: pedidoId });
+
     } catch (error) {
         if (connection) await connection.rollback();
         console.error("!!! Error procesando pedido contra entrega:", error);
-        res.status(error.message.includes("Stock insuficiente") ? 409 : 500).json({ success: false, message: error.message || "Error interno." });
+        res.status(error.message.includes("Stock insuficiente") ? 409 : 500).json({ success: false, message: error.message || "Error interno al procesar el pedido." });
     } finally {
         if (connection) connection.release();
     }
