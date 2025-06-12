@@ -1,5 +1,92 @@
 const { dbPool } = require('../../config/database');
 
+// --- Configuración del sitio (siteSettings) ---
+let siteSettings = {};
+
+async function loadSiteSettingsFromDB() {
+    try {
+        if (!dbPool) throw new Error('dbPool no inicializado');
+        const [rows] = await dbPool.query('SELECT setting_key, setting_value FROM site_settings');
+        rows.forEach(row => {
+            siteSettings[row.setting_key] = row.setting_value;
+        });
+        // Defaults
+        const defaultSettings = {
+            colorPrimary: '#ea580c', colorSecondary: '#047857', colorAccent: '#f1f5f9',
+            welcomeTitle: 'Bienvenido a Ferremax', promoBannerTitle: '¡Ofertas Imperdibles de Temporada!',
+            promoBannerText: 'Encuentra descuentos especiales en herramientas seleccionadas. ¡No te lo pierdas!',
+            contactAddress: 'Calle Falsa 123, Barranquilla, Colombia', contactPhone: '+57 300 123 4567',
+            contactEmail: 'info@ferremax.example.com', socialFacebook: '', socialTwitter: '',
+            socialInstagram: '', socialYoutube: ''
+        };
+        for (const key in defaultSettings) {
+            if (siteSettings[key] === undefined) {
+                siteSettings[key] = defaultSettings[key];
+                await dbPool.query('INSERT INTO site_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?', [key, defaultSettings[key], defaultSettings[key]]);
+            }
+        }
+    } catch (error) {
+        siteSettings = {
+            colorPrimary: '#ea580c', colorSecondary: '#047857', colorAccent: '#f1f5f9',
+            welcomeTitle: 'Bienvenido a Ferremax', promoBannerTitle: '¡Ofertas Imperdibles de Temporada!',
+            promoBannerText: 'Encuentra descuentos especiales en herramientas seleccionadas. ¡No te lo pierdas!',
+            contactAddress: 'Calle Falsa 123, Barranquilla, Colombia', contactPhone: '+57 300 123 4567',
+            contactEmail: 'info@ferremax.example.com', socialFacebook: '', socialTwitter: '',
+            socialInstagram: '', socialYoutube: ''
+        };
+    }
+}
+
+// --- Helper para cliente ---
+async function getOrCreateClienteId(connection, { username, email }) {
+    if (!email) throw new Error('El email es requerido para crear o encontrar un cliente.');
+    const [clientes] = await connection.query('SELECT ID_Cliente FROM cliente WHERE Email = ? LIMIT 1', [email]);
+    if (clientes.length > 0) return clientes[0].ID_Cliente;
+    const [result] = await connection.query('INSERT INTO cliente (Nombre, Apellido, Email) VALUES (?, ?, ?)', [username || email.split('@')[0], '', email]);
+    return result.insertId;
+}
+
+// --- /api/config ---
+const getConfig = (req, res) => {
+    res.status(200).json({
+        success: true,
+        wompiPublicKey: process.env.WOMPI_PUBLIC_KEY,
+        webhookUrl: `${process.env.BACKEND_URL}/api/wompi/webhook`
+    });
+};
+
+// --- /api/contact ---
+const postContact = async (req, res) => {
+    try {
+        const { name, email, subject, message } = req.body;
+        if (!name || !email || !message) {
+            return res.status(400).json({ success: false, message: 'Nombre, email y mensaje son requeridos.' });
+        }
+        await dbPool.query('INSERT INTO contact_messages (name, email, subject, message, created_at) VALUES (?, ?, ?, ?, NOW())', [name, email, subject || null, message]);
+        res.status(200).json({ success: true, message: '¡Mensaje recibido! Gracias por contactarnos.' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error interno al procesar el mensaje.' });
+    }
+};
+
+// --- /api/user/orders ---
+const getUserOrders = async (req, res) => {
+    const userId = req.userId;
+    try {
+        const [pedidos] = await dbPool.query(`SELECT p.ID_Pedido, p.Fecha_Pedido, p.Total_Pedido, p.Estado_Pedido, p.Metodo_Pago, p.Referencia_Pago FROM pedidos p WHERE p.ID_Usuario = ? ORDER BY p.Fecha_Pedido DESC`, [userId]);
+        if (pedidos.length === 0) return res.status(200).json({ success: true, orders: [] });
+        const ordersWithDetails = await Promise.all(
+            pedidos.map(async (pedido) => {
+                const [detalles] = await dbPool.query(`SELECT dp.ID_Producto, prod.Nombre as name, prod.imagen_url as imageUrl, dp.Cantidad as quantity, dp.Precio_Unitario_Compra as pricePaid FROM detalles_pedido dp JOIN producto prod ON dp.ID_Producto = prod.ID_Producto WHERE dp.ID_Pedido = ?`, [pedido.ID_Pedido]);
+                return { ...pedido, items: detalles };
+            })
+        );
+        res.status(200).json({ success: true, orders: ordersWithDetails });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error al obtener el historial de compras.' });
+    }
+};
+
 const getProductos = async (req, res) => {
     const limit = req.query.limit ? parseInt(req.query.limit) : null;
     try {
@@ -109,5 +196,11 @@ module.exports = {
   postReview,
   getCategories,
   postProductView,
-  getFeaturedProducts
+  getFeaturedProducts,
+  getConfig,
+  postContact,
+  getUserOrders,
+  loadSiteSettingsFromDB,
+  getOrCreateClienteId,
+  siteSettings
 };

@@ -5,6 +5,7 @@ const router = express.Router();
 const publicController = require('../controllers/publicController');
 const { getExchangeRate } = require('../../services/exchangeRateService');
 const { getGeminiResponse } = require('../../services/aiAssistantService');
+const { checkUser } = require('../middleware/authMiddleware');
 
 router.get('/productos', publicController.getProductos);
 router.get('/productos/:id', publicController.getProductoById);
@@ -35,5 +36,9 @@ router.post('/ai-assistant/chat', async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 });
+
+router.get('/config', publicController.getConfig);
+router.post('/contact', publicController.postContact);
+router.get('/user/orders', checkUser, publicController.getUserOrders);
 
 module.exports = router;
