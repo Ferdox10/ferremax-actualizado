@@ -1294,6 +1294,8 @@ const gracefulShutdown = (signal) => {
             }
 
 
+
+
         } catch (err) {
             console.error('!!! Error durante el cierre del pool de DB:', err);
         } finally {
@@ -1310,25 +1312,41 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 app.get('/api/products/featured', async (req, res) => {
     console.log("--> GET /api/products/featured (más vistos)");
     try {
+        // Esta consulta es más simple y directa.
+        // 1. Contamos las vistas por producto.
+        // 2. Unimos con la tabla de productos para obtener sus detalles.
+        // 3. Ordenamos por el conteo de vistas y limitamos a 4.
         const sql = `
             SELECT 
-                p.*, 
-                COALESCE(r.avg_rating, 0) as average_rating, 
-                COALESCE(r.review_count, 0) as review_count
+                p.*,
+                (SELECT AVG(Calificacion) FROM reseñas WHERE ID_Producto = p.ID_Producto) as average_rating,
+                (SELECT COUNT(*) FROM reseñas WHERE ID_Producto = p.ID_Producto) as review_count
             FROM 
-                vistas_producto vp
+                producto p
             JOIN 
-                producto p ON vp.ID_Producto = p.ID_Producto
-            LEFT JOIN 
-                (SELECT ID_Producto, AVG(Calificacion) as avg_rating, COUNT(*) as review_count FROM reseñas GROUP BY ID_Producto) r 
-            ON p.ID_Producto = r.ID_Producto
-            GROUP BY 
-                p.ID_Producto
+                (SELECT ID_Producto, COUNT(*) as view_count 
+                 FROM vistas_producto 
+                 GROUP BY ID_Producto) as v 
+            ON p.ID_Producto = v.ID_Producto
             ORDER BY 
-                COUNT(vp.ID_Vista) DESC
+                v.view_count DESC
             LIMIT 4;
         `;
         const [results] = await dbPool.query(sql);
+
+        // Si no hay productos con vistas, devolvemos los 4 primeros productos como fallback
+        if (results.length === 0) {
+            console.log("\tNo se encontraron productos con vistas, devolviendo productos de fallback.");
+            const [fallbackResults] = await dbPool.query(`
+                SELECT 
+                    p.*,
+                    COALESCE((SELECT AVG(Calificacion) FROM reseñas r WHERE r.ID_Producto = p.ID_Producto), 0) as average_rating,
+                    COALESCE((SELECT COUNT(*) FROM reseñas r WHERE r.ID_Producto = p.ID_Producto), 0) as review_count
+                FROM producto p LIMIT 4`
+            );
+            return res.status(200).json(fallbackResults);
+        }
+
         res.status(200).json(results);
     } catch (error) {
         console.error('!!! Error GET /api/products/featured:', error);
