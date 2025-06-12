@@ -292,16 +292,41 @@ app.post('/login', async (req, res) => {
 
 // --- RUTAS PÚBLICAS (PRODUCTOS, CATEGORÍAS, CONTACTO) ---
 app.get('/api/productos', async (req, res) => {
-    console.log("--> GET /api/productos");
+    console.log("--> GET /api/productos (con datos de reseñas)");
     const limit = req.query.limit ? parseInt(req.query.limit) : null;
+    
     try {
-        if (!dbPool) throw new Error("dbPool no inicializado en /api/productos");
-        let sql = 'SELECT ID_Producto, Nombre, Descripcion, precio_unitario, Marca, Codigo_Barras, ID_Categoria, cantidad, imagen_url, imagen_url_2, imagen_url_3, imagen_url_4, imagen_url_5 FROM producto';
+        // Consulta principal para obtener los productos
+        let sql = 'SELECT * FROM producto';
+        
+        // Subconsulta para calcular la calificación promedio y el conteo de reseñas
+        // Usamos LEFT JOIN para incluir productos que aún no tienen reseñas
+        sql = `
+            SELECT 
+                p.*, 
+                COALESCE(r.avg_rating, 0) as average_rating, 
+                COALESCE(r.review_count, 0) as review_count
+            FROM 
+                producto p
+            LEFT JOIN 
+                (SELECT 
+                    ID_Producto, 
+                    AVG(Calificacion) as avg_rating, 
+                    COUNT(*) as review_count 
+                FROM reseñas 
+                GROUP BY ID_Producto) r 
+            ON 
+                p.ID_Producto = r.ID_Producto
+        `;
+
         if (limit && Number.isInteger(limit) && limit > 0) {
+            // Nota: Si quieres los MÁS VENDIDOS o MÁS VISTOS, la consulta sería diferente.
+            // Por ahora, mantenemos el límite simple para los destacados.
             sql += ` LIMIT ${limit}`;
         }
+
         const [results] = await dbPool.query(sql);
-        console.log(`\t<-- Devolviendo ${results.length} productos públicos`);
+        console.log(`\t<-- Devolviendo ${results.length} productos con datos de reseñas.`);
         res.status(200).json(results);
     } catch (error) {
         console.error('!!! Error GET /api/productos:', error);
@@ -1267,6 +1292,7 @@ const gracefulShutdown = (signal) => {
                 await dbPool.end();
                 console.log('--> Pool de conexiones DB cerrado.');
             }
+
         } catch (err) {
             console.error('!!! Error durante el cierre del pool de DB:', err);
         } finally {
