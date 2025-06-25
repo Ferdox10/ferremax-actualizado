@@ -1,34 +1,22 @@
-// backend/middleware/authMiddleware.js
-const { getPool } = require('../config/database');
+// backend/config/ai.js
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
-const checkAdmin = (req, res, next) => {
-    const isAdminSimulated = req.headers['x-admin-simulated'] === 'true';
-    if (isAdminSimulated) {
-        return next();
-    }
-    console.warn(`\t[Admin Check] Acceso DENEGADO a ruta admin ${req.method} ${req.path}.`);
-    res.status(403).json({ success: false, message: 'Acceso prohibido. Se requieren permisos de administrador.' });
-};
+let genAI = null;
+let geminiModel = null;
 
-const checkUser = async (req, res, next) => {
-    const userId = req.headers['x-user-id'];
-    if (!userId || isNaN(parseInt(userId))) {
-        console.warn(`\t[User Check] Acceso DENEGADO: Falta o es inválido x-user-id.`);
-        return res.status(401).json({ success: false, message: 'Autenticación requerida.' });
-    }
-    try {
-        const dbPool = getPool();
-        const [users] = await dbPool.query('SELECT id FROM usuarios WHERE id = ?', [userId]);
-        if (users.length === 0) {
-            console.warn(`\t[User Check] Usuario con ID ${userId} no encontrado.`);
-            return res.status(401).json({ success: false, message: 'Usuario no válido.' });
+function initializeAI() {
+    if (process.env.GOOGLE_API_KEY) {
+        try {
+            genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+            geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+            console.log("--> SDK de Google AI (Gemini) inicializado correctamente.");
+        } catch (e) {
+            console.error("!!! Error al inicializar GoogleGenerativeAI. Verifica tu GOOGLE_API_KEY y la configuración del SDK:", e);
+            geminiModel = null;
         }
-        req.userId = parseInt(userId);
-        next();
-    } catch (error) {
-        console.error('!!! Error en middleware checkUser:', error);
-        return res.status(500).json({ success: false, message: 'Error de autenticación.' });
+    } else {
+        console.warn("!!! GOOGLE_API_KEY no está configurada. El asistente IA con Gemini no funcionará.");
     }
-};
+}
 
-module.exports = { checkAdmin, checkUser };
+module.exports = { initializeAI, get genAI() { return genAI; }, get geminiModel() { return geminiModel; } };
