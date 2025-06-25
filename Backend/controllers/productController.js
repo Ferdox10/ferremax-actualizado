@@ -28,7 +28,8 @@ const getAllProducts = async (req, res) => {
         const [results] = await dbPool.query(sql);
         res.status(200).json(results);
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Error al obtener los productos.' });
+        console.error('!!! Error GET /api/productos:', error);
+        res.status(500).json({ success: false, message: 'Error al obtener los productos.', error: error.message, stack: error.stack });
     }
 };
 
