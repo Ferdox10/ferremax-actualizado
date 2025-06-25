@@ -8,7 +8,7 @@ const productRoutes = require('./products');
 const orderRoutes = require('./orders');
 const publicRoutes = require('./public');
 const adminRoutes = require('./admin');
-const { chatWithAI } = require('../controllers/aiController');
+const { chat } = require('../controllers/aiController');
 const { getPublicConfig } = require('../controllers/publicController');
 
 // Rutas de Configuración Pública
@@ -21,7 +21,7 @@ router.use('/', publicRoutes); // Rutas públicas como /contact, /content/*
 router.use('/', orderRoutes); // Rutas de pago como /wompi/*, /orders/*
 
 // Ruta del Asistente IA
-router.post('/ai-assistant/chat', chatWithAI);
+router.post('/ai-assistant/chat', chat);
 
 // Rutas de Administración (protegidas por middleware dentro del propio archivo)
 router.use('/admin', adminRoutes);
