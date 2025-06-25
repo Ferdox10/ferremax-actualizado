@@ -15,7 +15,9 @@ async function initializeDB() {
             waitForConnections: true,
             connectionLimit: 10,
             queueLimit: 0,
-            ssl: process.env.DB_SSL_CA ? { ca: process.env.DB_SSL_CA, rejectUnauthorized: true } : null
+            ssl: process.env.DB_SSL_CA
+                ? { ca: process.env.DB_SSL_CA, rejectUnauthorized: true }
+                : (process.env.NODE_ENV === 'production' ? { rejectUnauthorized: true } : null)
         });
 
         const connection = await dbPool.getConnection();
