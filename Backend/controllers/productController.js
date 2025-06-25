@@ -1,5 +1,4 @@
 const dbPool = require('../config/database');
-const { getPool } = require('../config/database');
 
 const getAllProducts = async (req, res) => {
     const limit = req.query.limit ? parseInt(req.query.limit) : null;
@@ -86,7 +85,6 @@ const addProductReview = async (req, res) => {
 };
 
 const getFeaturedProducts = async (req, res) => {
-    const dbPool = getPool();
     console.log("--> GET /api/products/featured (más vistos)");
     try {
         const sql = `
