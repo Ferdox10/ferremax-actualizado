@@ -7,9 +7,11 @@ const chat = async (req, res) => {
         return res.status(400).json({ success: false, message: "Mensaje vacío." });
     }
     if (!geminiModel) {
-        return res.status(503).json({ success: false, message: "Asistente IA no disponible." });
+        console.error('!!! Error IA: geminiModel no inicializado. Verifica GOOGLE_API_KEY y la inicialización del SDK.');
+        return res.status(503).json({ success: false, message: "Asistente IA no disponible. Contacta al administrador." });
     }
     if (!dbPool) {
+        console.error('!!! Error IA: dbPool no inicializado.');
         return res.status(500).json({ success: false, message: "Error interno: Conexión a BD no disponible." });
     }
     try {
@@ -30,7 +32,8 @@ const chat = async (req, res) => {
         }
         res.json({ success: true, reply: aiReply });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        console.error('!!! Error en /api/ai-assistant/chat:', error);
+        res.status(500).json({ success: false, message: error.message, stack: error.stack });
     }
 };
 

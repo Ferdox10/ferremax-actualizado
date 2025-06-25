@@ -46,7 +46,8 @@ const createCashOnDeliveryOrder = async (req, res) => {
         res.status(201).json({ success: true, message: "Pedido contra entrega recibido exitosamente.", orderId: pedidoId });
     } catch (error) {
         if (connection) await connection.rollback();
-        res.status(error.message.includes("Stock insuficiente") ? 409 : 500).json({ success: false, message: error.message || "Error interno al procesar el pedido." });
+        console.error('!!! Error en /api/orders/cash-on-delivery:', error);
+        res.status(error.message && error.message.includes("Stock insuficiente") ? 409 : 500).json({ success: false, message: error.message || "Error interno al procesar el pedido.", stack: error.stack });
     } finally {
         if (connection) connection.release();
     }
@@ -109,7 +110,7 @@ const handleWompiWebhook = async (req, res) => {
             // Aquí deberías obtener el email del cliente y el clienteId
             const clienteId = await getOrCreateClienteId(connection, { username: orderDetails.customerData?.name, email: orderDetails.customerData?.email });
             const [pedidoResult] = await connection.query(
-                `INSERT INTO pedidos (ID_Usuario, Total_Pedido, Estado_Pedido, Metodo_Pago, Referencia_Pago, Nombre_Cliente_Envio, Email_Cliente_Envio, Telefono_Cliente_Envio, Direccion_Envio, Departamento_Envio, Ciudad_Envio, Punto_Referencia_Envio, Fecha_Pedido, ID_Cliente) VALUES (?, ?, 'Pagado', 'Wompi', ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
+                `INSERT INTO pedidos (ID_Usuario, Total_Pedido, Estado_Pedido, Metodo_Pago, Referencia_Pago, Nombre_Cliente_Envio, Email_Cliente_Envio, Telefono_Cliente_Envio, Direccion_Envio, Departamento_Envio, Ciudad_Envio, Punto_Referencia_Envio, Fecha_Pedido, ID_Cliente) VALUES (?, ?, 'Pagado', 'Wompi', ?, ?, ?, ?, ?, ?, NOW(), ?)`,
                 [orderDetails.userId || null, orderDetails.total, transactionReference, orderDetails.customerData?.name, orderDetails.customerData?.email, orderDetails.customerData?.phone, orderDetails.customerData?.address, orderDetails.customerData?.department, orderDetails.customerData?.city, orderDetails.customerData?.complement || null, clienteId]
             );
             const pedidoId = pedidoResult.insertId;
@@ -198,7 +199,7 @@ const capturePaypalOrder = async (req, res) => {
             }
             const clienteId = await getOrCreateClienteId(connection, { username: shippingDetails.name, email: shippingDetails.email });
             const [pedidoResult] = await connection.query(
-                `INSERT INTO pedidos (ID_Usuario, Total_Pedido, Estado_Pedido, Metodo_Pago, Referencia_Pago, Nombre_Cliente_Envio, Direccion_Envio, Departamento_Envio, Ciudad_Envio, Punto_Referencia_Envio, Telefono_Cliente_Envio, Email_Cliente_Envio, Fecha_Pedido, ID_Cliente) VALUES (?, ?, 'Pagado', 'PayPal', ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
+                `INSERT INTO pedidos (ID_Usuario, Total_Pedido, Estado_Pedido, Metodo_Pago, Referencia_Pago, Nombre_Cliente_Envio, Direccion_Envio, Departamento_Envio, Ciudad_Envio, Punto_Referencia_Envio, Telefono_Cliente_Envio, Email_Cliente_Envio, Fecha_Pedido, ID_Cliente) VALUES (?, ?, 'Pagado', 'PayPal', ?, ?, ?, ?, ?, ?, NOW(), ?)`,
                 [userId || null, totalPedido, orderID, shippingDetails.name, shippingDetails.address, shippingDetails.department, shippingDetails.city, shippingDetails.referencePoint || null, shippingDetails.phone, shippingDetails.email, clienteId]
             );
             const pedidoId = pedidoResult.insertId;
