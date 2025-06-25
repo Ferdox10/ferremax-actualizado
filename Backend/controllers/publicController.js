@@ -93,4 +93,17 @@ const getCurrencyRate = async (req, res) => {
     }
 };
 
-module.exports = { getCategories, handleContactForm, trackProductView, getPublicPolicies, getPublicFaqs, getCurrencyRate };
+// Obtener configuración pública para el frontend
+const getPublicConfig = async (req, res) => {
+    const dbPool = getPool();
+    try {
+        const [settings] = await dbPool.query('SELECT setting_key, setting_value FROM site_settings');
+        const settingsObj = {};
+        settings.forEach(s => { settingsObj[s.setting_key] = s.setting_value; });
+        res.status(200).json({ success: true, settings: settingsObj });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Error al obtener la configuración pública.' });
+    }
+};
+
+module.exports = { getCategories, handleContactForm, trackProductView, getPublicPolicies, getPublicFaqs, getCurrencyRate, getPublicConfig };

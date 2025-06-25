@@ -126,4 +126,10 @@ const getFeaturedProducts = async (req, res) => {
     }
 };
 
-module.exports = { getAllProducts, getProductById, getProductReviews, addProductReview, getFeaturedProducts };
+module.exports = {
+    getAllProducts,
+    getProductById,
+    getProductReviews,
+    addProductReview,
+    getFeaturedProducts
+};
