@@ -5,7 +5,9 @@ const {
     handleContactForm,
     getCurrencyRate,
     getPublicPolicies,
-    getPublicFaqs
+    getPublicFaqs,
+    getCategories,
+    trackProductView
 } = require('../controllers/publicController');
 
 // Ruta para el formulario de contacto
@@ -17,5 +19,11 @@ router.get('/currency/rate', getCurrencyRate);
 // Rutas para contenido público (políticas, FAQ)
 router.get('/content/policies', getPublicPolicies);
 router.get('/content/faq', getPublicFaqs);
+
+// Ruta para obtener categorías
+router.get('/categories', getCategories);
+
+// Ruta para registrar vista de producto
+router.post('/products/:id/view', trackProductView);
 
 module.exports = router;

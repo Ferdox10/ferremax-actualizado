@@ -6,18 +6,13 @@ const {
     getProductById,
     getFeaturedProducts,
     getProductReviews,
-    addProductReview,
-    trackProductView,
-    getAllCategories
+    addProductReview
 } = require('../controllers/productController');
-const { checkUser } = require('../middleware/authMiddleware');
 
 // Rutas públicas de productos
 router.get('/', getAllProducts);
 router.get('/featured', getFeaturedProducts);
-router.get('/categories', getAllCategories);
 router.get('/:id', getProductById);
-router.post('/:id/view', trackProductView);
 
 // Rutas de reseñas
 router.get('/:id/reviews', getProductReviews);
