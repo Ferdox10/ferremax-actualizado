@@ -1,4 +1,5 @@
 const dbPool = require('../config/database');
+const { getPool } = require('../config/database');
 
 const getAllProducts = async (req, res) => {
     const limit = req.query.limit ? parseInt(req.query.limit) : null;
@@ -83,4 +84,46 @@ const addProductReview = async (req, res) => {
     }
 };
 
-module.exports = { getAllProducts, getProductById, getProductReviews, addProductReview };
+const getFeaturedProducts = async (req, res) => {
+    const dbPool = getPool();
+    console.log("--> GET /api/products/featured (más vistos)");
+    try {
+        const sql = `
+            SELECT 
+                p.*,
+                (SELECT AVG(Calificacion) FROM reseñas WHERE ID_Producto = p.ID_Producto) as average_rating,
+                (SELECT COUNT(*) FROM reseñas WHERE ID_Producto = p.ID_Producto) as review_count
+            FROM 
+                producto p
+            JOIN 
+                (SELECT ID_Producto, COUNT(*) as view_count 
+                 FROM vistas_producto 
+                 GROUP BY ID_Producto) as v 
+            ON p.ID_Producto = v.ID_Producto
+            ORDER BY 
+                v.view_count DESC
+            LIMIT 4;
+        `;
+        const [results] = await dbPool.query(sql);
+
+        // Si no hay productos con vistas, devolvemos los 4 primeros productos como fallback
+        if (results.length === 0) {
+            console.log("\tNo se encontraron productos con vistas, devolviendo productos de fallback.");
+            const [fallbackResults] = await dbPool.query(`
+                SELECT 
+                    p.*,
+                    COALESCE((SELECT AVG(Calificacion) FROM reseñas r WHERE r.ID_Producto = p.ID_Producto), 0) as average_rating,
+                    COALESCE((SELECT COUNT(*) FROM reseñas r WHERE r.ID_Producto = p.ID_Producto), 0) as review_count
+                FROM producto p LIMIT 4`
+            );
+            return res.status(200).json(fallbackResults);
+        }
+
+        res.status(200).json(results);
+    } catch (error) {
+        console.error('!!! Error GET /api/products/featured:', error);
+        res.status(500).json({ success: false, message: 'Error al obtener productos destacados.' });
+    }
+};
+
+module.exports = { getAllProducts, getProductById, getProductReviews, addProductReview, getFeaturedProducts };
