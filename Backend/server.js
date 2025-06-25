@@ -1,40 +1,59 @@
-// server.js - Servidor Backend para Ferremax
-// Versión limpia y modularizada, lista para producción
-
-// --- CONFIGURACIÓN Y DEPENDENCIAS ---
+// backend/server.js
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const { initializeDB } = require('./config/database');
+const { loadSiteSettings } = require('./services/siteSettings');
+const { initializeAI } = require('./config/ai');
+const mainRouter = require('./routes'); // Importa el enrutador principal
+
 const app = express();
 const PORT = process.env.PORT || 4000;
+const isProduction = process.env.NODE_ENV === 'production';
 
-// --- MIDDLEWARES GLOBALES ---
+// --- MIDDLEWARE GENERAL ---
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// --- IMPORTAR ROUTERS ---
-const authRoutes = require('./routes/auth');
-const productRoutes = require('./routes/products');
-const publicRoutes = require('./routes/public');
-const orderRoutes = require('./routes/orders');
-const adminRoutes = require('./routes/admin');
+// --- RUTAS PRINCIPALES DE LA API ---
+// Todas las rutas estarán bajo el prefijo /api
+app.use('/api', mainRouter);
 
-// --- USAR ROUTERS ---
-app.use('/api', productRoutes);
-app.use('/api', publicRoutes);
-app.use('/api', orderRoutes);
-app.use('/api', authRoutes);
-app.use('/api/admin', adminRoutes);
+// --- INICIO DEL SERVIDOR ---
+async function startServer() {
+    try {
+        await initializeDB();
+        await loadSiteSettings();
+        initializeAI(); // Inicializa el SDK de Gemini
 
-// --- RUTA PARA EL ASISTENTE IA ---
-const { chat } = require('./controllers/aiController');
-app.post('/api/ai-assistant/chat', chat);
+        const server = app.listen(PORT, () => {
+            console.log("\n========================================");
+            console.log(`==> Servidor Ferremax escuchando en puerto ${PORT}`);
+            console.log(`==> Modo: ${isProduction ? 'Producción' : 'Desarrollo'}`);
+            console.log("========================================");
+        });
 
-// --- RUTA DE SALUD ---
-app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+        // Manejo de cierre graceful
+        const gracefulShutdown = (signal) => {
+            console.log(`\n==> Recibida señal ${signal}. Cerrando servidor...`);
+            server.close(async () => {
+                console.log('--> Servidor HTTP cerrado.');
+                const { getPool } = require('./config/database');
+                const dbPool = getPool();
+                if (dbPool) await dbPool.end();
+                console.log('--> Pool de DB cerrado.');
+                process.exit(0);
+            });
+        };
 
-// --- INICIAR SERVIDOR ---
-app.listen(PORT, () => {
-  console.log(`Servidor Ferremax escuchando en puerto ${PORT}`);
-});
+        process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+        process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+
+    } catch (error) {
+        console.error("Fallo CRÍTICO al inicializar la aplicación. El servidor no arrancará.", error);
+        process.exit(1);
+    }
+}
+
+startServer();

@@ -1,8 +1,13 @@
+// backend/controllers/authController.js
 const bcrypt = require('bcrypt');
-const dbPool = require('../config/database');
+const { getPool } = require('../config/database');
+const clientService = require('../services/clientService');
+
 const saltRounds = 10;
 
-const register = async (req, res) => {
+exports.registerUser = async (req, res) => {
+    const dbPool = getPool();
+    console.log("--> POST /register");
     try {
         const { username, email, password } = req.body;
         if (!username || !email || !password || password.length < 6) {
@@ -14,30 +19,30 @@ const register = async (req, res) => {
         }
         const hashedPassword = await bcrypt.hash(password, saltRounds);
         const [result] = await dbPool.query(
-            'INSERT INTO usuarios (username, email, password, role) VALUES (?, ?, ?, ?)', 
+            'INSERT INTO usuarios (username, email, password, role) VALUES (?, ?, ?, ?)',
             [username, email, hashedPassword, 'cliente']
         );
-        const [existingCliente] = await dbPool.query('SELECT ID_Cliente FROM cliente WHERE Email = ? LIMIT 1', [email]);
-        if (existingCliente.length === 0) {
-            await dbPool.query(
-                'INSERT INTO cliente (Nombre, Apellido, Email) VALUES (?, ?, ?)', 
-                [username || '', '', email]
-            );
-        }
+        
+        // Usar el servicio para crear el cliente asociado
+        await clientService.getOrCreateClienteId(dbPool, { username, email });
+        
         res.status(201).json({ success: true, message: 'Usuario registrado exitosamente.' });
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Error interno del servidor durante el registro.' });
+        console.error('!!! Error en /register:', error);
+        res.status(500).json({ success: false, message: 'Error interno del servidor.' });
     }
 };
 
-const login = async (req, res) => {
+exports.loginUser = async (req, res) => {
+    const dbPool = getPool();
+    console.log("--> POST /login");
     try {
         const { email, password } = req.body;
         if (!email || !password) {
             return res.status(400).json({ success: false, message: 'Correo y contraseña son requeridos.' });
         }
         const [users] = await dbPool.query(
-            'SELECT id, username, email, password, role FROM usuarios WHERE email = ? LIMIT 1', 
+            'SELECT id, username, email, password, role FROM usuarios WHERE email = ? LIMIT 1',
             [email]
         );
         if (users.length === 0) {
@@ -55,8 +60,7 @@ const login = async (req, res) => {
             res.status(401).json({ success: false, message: 'Credenciales incorrectas.' });
         }
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Error interno del servidor durante el login.' });
+        console.error('!!! Error en /login:', error);
+        res.status(500).json({ success: false, message: 'Error interno del servidor.' });
     }
 };
-
-module.exports = { register, login };

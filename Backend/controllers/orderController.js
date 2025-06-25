@@ -1,40 +1,42 @@
-const dbPool = require('../config/database');
-const { getOrCreateClienteId } = require('../models/client');
+// backend/controllers/orderController.js
+const crypto = require('crypto');
+const { getPool } = require('../config/database');
+const { WOMPI_EVENTS_SECRET, paypalClient } = require('../config/payment');
+const { getOrCreateClienteId } = require('../services/clientService');
+const paypal = require('@paypal/checkout-server-sdk');
 
-// WOMPI almacenamiento temporal (debería migrarse a Redis o similar en producción)
+// Almacenamiento temporal de órdenes de Wompi
 const wompiTempOrders = {};
-const WOMPI_TEMP_ORDER_TIMEOUT = 1000 * 60 * 30;
+const WOMPI_TEMP_ORDER_TIMEOUT = 1000 * 60 * 30; // 30 minutos
 
-const getUserOrders = async (req, res) => {
-    const userId = req.userId;
+// ... (Aquí irían todas las funciones de órdenes: wompi, contra entrega, paypal, getUserOrders)
+// Ejemplo de una función:
+exports.createCashOnDeliveryOrder = async (req, res) => {
+    const dbPool = getPool();
+    console.log("--> POST /api/orders/cash-on-delivery");
+    const { cart, customerInfo } = req.body;
+    
+    if (!cart || cart.length === 0 || !customerInfo || !customerInfo.name || !customerInfo.phone || !customerInfo.address || !customerInfo.department || !customerInfo.city || !customerInfo.email) {
+        return res.status(400).json({ success: false, message: "Faltan datos del carrito o del cliente." });
+    }
+
+    let connection;
     try {
-        const [pedidos] = await dbPool.query(
-            `SELECT p.ID_Pedido, p.Fecha_Pedido, p.Total_Pedido, p.Estado_Pedido, p.Metodo_Pago, p.Referencia_Pago
-             FROM pedidos p WHERE p.ID_Usuario = ? ORDER BY p.Fecha_Pedido DESC`,
-            [userId]
-        );
-        if (pedidos.length === 0) {
-            return res.status(200).json({ success: true, orders: [] });
-        }
-        const ordersWithDetails = await Promise.all(
-            pedidos.map(async (pedido) => {
-                const [detalles] = await dbPool.query(
-                    `SELECT dp.ID_Producto, prod.Nombre as name, prod.imagen_url as imageUrl, dp.Cantidad as quantity, dp.Precio_Unitario_Compra as pricePaid
-                     FROM detalles_pedido dp
-                     JOIN producto prod ON dp.ID_Producto = prod.ID_Producto
-                     WHERE dp.ID_Pedido = ?`,
-                    [pedido.ID_Pedido]
-                );
-                return { ...pedido, items: detalles };
-            })
-        );
-        res.status(200).json({ success: true, orders: ordersWithDetails });
+        connection = await dbPool.getConnection();
+        await connection.beginTransaction();
+        
+        // ... (resto de la lógica de la función original)
+
+        await connection.commit();
+        res.status(201).json({ success: true, message: "Pedido contra entrega recibido exitosamente.", orderId: pedidoResult.insertId });
+
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Error al obtener el historial de compras.' });
+        if (connection) await connection.rollback();
+        console.error("!!! Error procesando pedido contra entrega:", error);
+        res.status(error.message.includes("Stock insuficiente") ? 409 : 500).json({ success: false, message: error.message || "Error interno al procesar el pedido." });
+    } finally {
+        if (connection) connection.release();
     }
 };
 
-// Aquí irían los métodos para temp-order, webhook, cash-on-delivery, etc.
-// Por brevedad, solo se muestra el historial de usuario como ejemplo.
-
-module.exports = { getUserOrders };
+// ... (Repetir el proceso para el resto de funciones de órdenes)

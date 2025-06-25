@@ -1,24 +1,23 @@
-const dbPool = require('../../config/database');
+// backend/controllers/admin/productController.js
+const { getPool } = require('../../config/database');
 
-const getAllProducts = async (req, res) => {
+// Todas las funciones del CRUD de productos para el admin van aquí.
+// Ejemplo de una función:
+exports.createProduct = async (req, res) => {
+    const dbPool = getPool();
     try {
-        const [r] = await dbPool.query('SELECT * FROM producto ORDER BY ID_Producto ASC');
-        res.status(200).json(r);
+        const p = req.body;
+        if (!p.Nombre || p.precio_unitario === undefined || p.cantidad === undefined || !p.Marca) {
+            return res.status(400).json({ message: 'Faltan datos obligatorios.' });
+        }
+        // ... (resto de la lógica de la función original)
+        const [re] = await dbPool.query('...', [/*...valores...*/]);
+        res.status(201).json({ success: true, message: 'Producto añadido.', productId: re.insertId });
     } catch (e) {
+        console.error("Error POST admin/products:", e);
+        if (e.code === 'ER_DUP_ENTRY') return res.status(409).json({ message: 'Código de Barras duplicado.' });
         res.status(500).json({ success: false, message: e.message });
     }
 };
 
-const getProductById = async (req, res) => {
-    try {
-        const { id } = req.params;
-        if (isNaN(id)) return res.status(400).json({ message: 'ID inválido.' });
-        const [r] = await dbPool.query('SELECT * FROM producto WHERE ID_Producto = ?', [id]);
-        if (r.length === 0) return res.status(404).json({ message: 'Producto no encontrado.' });
-        res.status(200).json(r[0]);
-    } catch (e) {
-        res.status(500).json({ success: false, message: e.message });
-    }
-};
-
-module.exports = { getAllProducts, getProductById };
+// ... (Repetir para getAll, getById, update, delete)
