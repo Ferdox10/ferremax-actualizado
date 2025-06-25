@@ -36,4 +36,13 @@ function getPool() {
     return dbPool;
 }
 
-module.exports = { initializeDB, getPool };
+// Exporta el pool como función (para compatibilidad) y como default para los controladores
+module.exports = new Proxy({}, {
+    get(target, prop) {
+        if (prop === 'initializeDB') return initializeDB;
+        if (prop === 'getPool') return getPool;
+        // Permite usar dbPool.query directamente
+        if (!dbPool) throw new Error('El pool de la base de datos no ha sido inicializado.');
+        return dbPool[prop];
+    }
+});
