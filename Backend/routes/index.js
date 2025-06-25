@@ -10,6 +10,7 @@ const publicRoutes = require('./public');
 const adminRoutes = require('./admin');
 const { chat } = require('../controllers/aiController');
 const { getPublicConfig } = require('../controllers/publicController');
+const { getAllProducts, getProductById } = require('../controllers/productController');
 
 // Rutas de Configuración Pública
 router.get('/config', getPublicConfig);
@@ -25,5 +26,9 @@ router.post('/ai-assistant/chat', chat);
 
 // Rutas de Administración (protegidas por middleware dentro del propio archivo)
 router.use('/admin', adminRoutes);
+
+// Alias para compatibilidad con frontend antiguo (rutas en español)
+router.get('/productos', getAllProducts);
+router.get('/productos/:id', getProductById);
 
 module.exports = router;
