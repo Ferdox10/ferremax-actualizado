@@ -15,9 +15,6 @@ function initializeAI() {
             console.log("--> SDK de Google AI (Gemini) inicializado correctamente.");
         } catch (e) {
             console.error("!!! Error al inicializar GoogleGenerativeAI. Verifica tu GOOGLE_API_KEY y la configuración del SDK:", e);
-            if (e && e.stack) {
-                console.error("Stack del error de inicialización Gemini:", e.stack);
-            }
             geminiModel = null;
         }
     } else {
@@ -25,4 +22,9 @@ function initializeAI() {
     }
 }
 
-module.exports = { initializeAI, get genAI() { return genAI; }, get geminiModel() { return geminiModel; } };
+// Exportar la función de inicialización y los getters para las instancias
+module.exports = { 
+    initializeAI, 
+    get genAI() { return genAI; }, 
+    get geminiModel() { return geminiModel; } 
+};
