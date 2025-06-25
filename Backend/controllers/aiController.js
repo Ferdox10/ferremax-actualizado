@@ -7,7 +7,9 @@ const chat = async (req, res) => {
         return res.status(400).json({ success: false, message: "Mensaje vacío." });
     }
     if (!geminiModel) {
-        console.error('!!! Error IA: geminiModel no inicializado. Verifica GOOGLE_API_KEY y la inicialización del SDK.');
+        const apiKey = process.env.GOOGLE_API_KEY;
+        const maskedKey = apiKey ? (apiKey.length > 8 ? apiKey.slice(0, 4) + '...' + apiKey.slice(-4) : '****') : 'NO DEFINIDA';
+        console.error(`!!! Error IA: geminiModel no inicializado. GOOGLE_API_KEY: ${maskedKey} (longitud: ${apiKey ? apiKey.length : 0})`);
         return res.status(503).json({ success: false, message: "Asistente IA no disponible. Contacta al administrador." });
     }
     if (!dbPool) {

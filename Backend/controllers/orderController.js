@@ -34,7 +34,7 @@ const createCashOnDeliveryOrder = async (req, res) => {
         const clienteId = await getOrCreateClienteId(connection, { username: customerInfo.name, email: customerInfo.email });
         if (!clienteId) throw new Error(`No se pudo crear o encontrar un ID de cliente para el email ${customerInfo.email}`);
         const [pedidoResult] = await connection.query(
-            `INSERT INTO pedidos (ID_Usuario, Total_Pedido, Estado_Pedido, Metodo_Pago, Nombre_Cliente_Envio, Direccion_Envio, Departamento_Envio, Ciudad_Envio, Punto_Referencia_Envio, Telefono_Cliente_Envio, Email_Cliente_Envio, Fecha_Pedido, ID_Cliente) VALUES (?, ?, 'Pendiente de Confirmacion', 'ContraEntrega', ?, ?, ?, ?, ?, ?, NOW(), ?)`,
+            `INSERT INTO pedidos (ID_Usuario, Total_Pedido, Estado_Pedido, Metodo_Pago, Nombre_Cliente_Envio, Direccion_Envio, Departamento_Envio, Ciudad_Envio, Punto_Referencia_Envio, Telefono_Cliente_Envio, Email_Cliente_Envio, Fecha_Pedido, ID_Cliente) VALUES (?, ?, 'Pendiente de Confirmacion', 'ContraEntrega', ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)`,
             [customerInfo.userId || null, totalPedido, customerInfo.name, customerInfo.address, customerInfo.department, customerInfo.city, customerInfo.complement || null, customerInfo.phone, customerInfo.email, clienteId]
         );
         const pedidoId = pedidoResult.insertId;

@@ -5,9 +5,12 @@ let genAI = null;
 let geminiModel = null;
 
 function initializeAI() {
-    if (process.env.GOOGLE_API_KEY) {
+    const apiKey = process.env.GOOGLE_API_KEY;
+    if (apiKey) {
         try {
-            genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+            const maskedKey = apiKey.length > 8 ? apiKey.slice(0, 4) + '...' + apiKey.slice(-4) : '****';
+            console.log(`--> GOOGLE_API_KEY detectada: ${maskedKey} (longitud: ${apiKey.length})`);
+            genAI = new GoogleGenerativeAI(apiKey);
             geminiModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
             console.log("--> SDK de Google AI (Gemini) inicializado correctamente.");
         } catch (e) {
